@@ -87,6 +87,8 @@ test.describe('start page', () => {
 
   test('footer carries the agreed wording and no claim of nothing being uploaded', async ({ page }) => {
     await page.goto('/');
+    await expect(page.locator('h1').first()).toHaveText('Inspect bone anatomy in 3D.');
+    await expect(page.locator('body')).not.toContainText('Veterinary CT to 3D');
     await expect(page.locator('.alt-orta')).toContainText('Not suitable for surgical planning or 3D printing');
     await expect(page.locator('.alt-sag')).toContainText('© 2026 Vimics');
     await expect(page.locator('body')).not.toContainText(/nothing (is )?uploaded/i);
@@ -104,6 +106,7 @@ test.describe('viewer', () => {
     await expect(page.locator('#yapilar li')).toHaveCount(1);
     await expect(page.locator('.yakinda')).toContainText('A neural network bone segmentation engine is in training at Vimics HQ, will be available at vimics.vet/segmentation, at no charge.');
     await expect(page.locator('.urun-ad')).toHaveText('V-Seg Engine v1.0');
+    await expect(page.locator('.ray .etiket')).toHaveText(['Coming soon', 'Series', 'Threshold', 'Structures', 'Measure', 'Clip', 'Case storage']);
     await expect(page.locator('.ray > *').first()).toHaveClass('yakinda');
     await expect(page.locator('.kup button').first()).toHaveText('Z');
     await expect(page.locator('body')).not.toContainText('Verify left and right');

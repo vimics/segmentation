@@ -31,8 +31,7 @@
 <main class="baslangic" id="baslangic">
   <form class="baslangic-ic" id="form" novalidate>
     <div class="baslangic-bas">
-      <p class="etiket">Veterinary CT to 3D</p>
-      <h1>See the bones in a CT, in seconds</h1>
+      <h1>Inspect bone anatomy in 3D.</h1>
       <p class="lead">Enter the patient, drop a DICOM series, and get a 3D model you can rotate, clip and measure.</p>
     </div>
 
@@ -148,21 +147,21 @@
     </section>
 
     <section class="bolme">
-      <p class="etiket">Clip</p>
-      <div id="kesitler">
-        <label class="kesit"><input type="checkbox" data-eksen="0" aria-label="Clip along X"><span>X</span><input type="range" data-eksen="0" step="0.5" disabled aria-label="X position"></label>
-        <label class="kesit"><input type="checkbox" data-eksen="1" aria-label="Clip along Y"><span>Y</span><input type="range" data-eksen="1" step="0.5" disabled aria-label="Y position"></label>
-        <label class="kesit"><input type="checkbox" data-eksen="2" aria-label="Clip along Z"><span>Z</span><input type="range" data-eksen="2" step="0.5" disabled aria-label="Z position"></label>
-      </div>
-    </section>
-
-    <section class="bolme">
       <p class="etiket">Measure</p>
       <div class="olcu-araclar">
         <button class="arac" type="button" data-arac="distance" aria-pressed="false">Distance</button>
         <button class="arac" type="button" data-arac="angle" aria-pressed="false">Angle</button>
       </div>
       <ul class="olculer" id="olculer"></ul>
+    </section>
+
+    <section class="bolme">
+      <p class="etiket">Clip</p>
+      <div id="kesitler">
+        <label class="kesit"><input type="checkbox" data-eksen="0" aria-label="Clip along X"><span>X</span><input type="range" data-eksen="0" step="0.5" disabled aria-label="X position"></label>
+        <label class="kesit"><input type="checkbox" data-eksen="1" aria-label="Clip along Y"><span>Y</span><input type="range" data-eksen="1" step="0.5" disabled aria-label="Y position"></label>
+        <label class="kesit"><input type="checkbox" data-eksen="2" aria-label="Clip along Z"><span>Z</span><input type="range" data-eksen="2" step="0.5" disabled aria-label="Z position"></label>
+      </div>
     </section>
 
     <section class="bolme" id="depo">
