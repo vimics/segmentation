@@ -45,5 +45,6 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: { input: { main: resolve(import.meta.dirname, 'index.html'), privacy: resolve(import.meta.dirname, 'privacy.html') } },
   },
   worker: { format: 'es' },
-  test: { include: ['test/**/*.test.ts'] },
+  // Several tests build full meshes, and CI runners are far slower than a development machine.
+  test: { include: ['test/**/*.test.ts'], testTimeout: 60_000 },
 }));

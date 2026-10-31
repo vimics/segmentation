@@ -102,12 +102,14 @@ describe('what vets actually send', () => {
   it('reads only the start of a file, loose or zipped', async () => {
     const big = new Uint8Array(HEAD_BYTES * 3).map((_, i) => (i * 7) % 251);
     const wanted = big.slice(0, HEAD_BYTES);
+    // Byte comparison, because comparing arrays this long element by element takes seconds.
+    const same = (a: Uint8Array, b: Uint8Array) => Buffer.compare(a, b) === 0;
     const loose = await readHead({ file: asFile(big, 'x'), name: 'x' }, HEAD_BYTES);
-    expect(loose).toEqual(wanted);
+    expect(same(loose, wanted)).toBe(true);
     for (const level of [0, 6] as const) {
       const [member] = await listZip(asFile(zipSync({ x: big }, { level }), 'x.zip'));
-      expect(await readHead(member, HEAD_BYTES)).toEqual(wanted);
-      expect(await readSource(member)).toEqual(big);
+      expect(same(await readHead(member, HEAD_BYTES), wanted)).toBe(true);
+      expect(same(await readSource(member), big)).toBe(true);
     }
     const [small] = await listZip(asFile(zipSync({ s: strToU8('short') }), 's.zip'));
     expect(new TextDecoder().decode(await readHead(small, HEAD_BYTES))).toBe('short');
