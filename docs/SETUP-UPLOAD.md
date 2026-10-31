@@ -77,7 +77,7 @@ Until this is set, the viewer works normally and the sidebar says storage isn't 
 Open the site with the code in the address:
 
 ```
-https://umuttutal.github.io/bone3d/?code=YOUR_ACCESS_CODE
+https://umuttutal.github.io/v-seg/?code=YOUR_ACCESS_CODE
 ```
 
 Load an anonymised case. The sidebar should end with **Stored with Vimics** and a reference such as `BV-20261031-3FA91C07D2`.
