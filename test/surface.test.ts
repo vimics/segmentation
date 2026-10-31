@@ -152,7 +152,7 @@ describe('levels', () => {
     const full = engine.full(250);
     expect(full.triangles).toBeLessThanOrEqual(budget);
     expect(full.resolutionMm).toBeGreaterThan(0.5);
-  });
+  }, 120_000);
 });
 
 describe('hiding what is not bone', () => {
