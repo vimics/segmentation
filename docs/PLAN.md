@@ -1,4 +1,4 @@
-# Vimics Bone Viewer: plan
+# V-Seg Engine: plan
 
 ## Purpose
 
@@ -26,7 +26,8 @@ Viewer header order: `Patient Name · Cat or Dog · Breed · Age · Weight kg ·
 
 ## Interface wording
 
-- Sidebar: "Coming soon. A neural network bone segmentation engine is in training at Vimics HQ. It will be available at vimics.vet, at no charge."
+- Top strip: "V-Seg Engine v1.0"
+- Sidebar, above all controls: "A neural network bone segmentation engine is in training at Vimics HQ, will be available at vimics.vet/segmentation, at no charge."
 - Footer: "Not suitable for surgical planning or 3D printing, which require human inspection with validated medical software. © 2026 Vimics"
 
 ## Pipeline
@@ -55,7 +56,7 @@ Abuse controls on the public endpoint: origin allow-list, size cap, per-address 
 ## Clinical accuracy rules
 
 - Bone preset starts at about 250 HU and is tuned on real cases. The slider is always available.
-- The orientation cube shows what the DICOM file states, with a note to verify left and right. Handedness has its own test.
+- The cube and clip controls use plain X, Y and Z axes, so the screen makes no left or right claim. Handedness has its own test.
 - Series with irregular spacing, missing slices or thick slices show a warning. Missing position data stops the load with a clear message.
 - Series flagged as having burned-in annotations are not uploaded.
 

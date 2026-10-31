@@ -1,4 +1,4 @@
-# Vimics Bone Viewer
+# V-Seg Engine (Vimics)
 
 A browser tool for veterinary CT. A vet enters patient details and drops a DICOM series, and gets a 3D bone model they can rotate, clip and measure. With the vet's consent, a de-identified copy of the scan is stored in Vimics SharePoint to train a bone segmentation network.
 

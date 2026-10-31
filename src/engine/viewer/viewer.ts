@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { StructureMesh, SurfaceResult, Vec3 } from '../types';
 
 const IVORY = 0xf6ecd6, CAP = 0xcdbb99, HIGHLIGHT = 0x4cb088;
-const FACES: Record<string, Vec3> = { H: [0, 0, 1], F: [0, 0, -1], L: [1, 0, 0], R: [-1, 0, 0], P: [0, 1, 0], A: [0, -1, 0] };
+const FACES: Record<string, Vec3> = { z: [0, 0, 1], '-z': [0, 0, -1], x: [1, 0, 0], '-x': [-1, 0, 0], y: [0, 1, 0], '-y': [0, -1, 0] };
 
 export type MeasureKind = 'distance' | 'angle';
 export interface Measurement { id: string; kind: MeasureKind; points: THREE.Vector3[]; value: string; }

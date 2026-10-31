@@ -87,7 +87,7 @@ test.describe('start page', () => {
 
   test('footer carries the agreed wording and no claim of nothing being uploaded', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('.alt-sag')).toContainText('Not suitable for surgical planning or 3D printing');
+    await expect(page.locator('.alt-orta')).toContainText('Not suitable for surgical planning or 3D printing');
     await expect(page.locator('.alt-sag')).toContainText('© 2026 Vimics');
     await expect(page.locator('body')).not.toContainText(/nothing (is )?uploaded/i);
   });
@@ -102,14 +102,18 @@ test.describe('viewer', () => {
 
     await expect(page.locator('#vaka-satir')).toHaveText('Max · Dog · Beagle · 3 y 2 mo · 12.4 kg · Jane Doe, DVM · 12 Oct 2026');
     await expect(page.locator('#yapilar li')).toHaveCount(1);
-    await expect(page.locator('.yakinda')).toContainText('A neural network bone segmentation engine is in training at Vimics HQ');
-    await expect(page.locator('#alt-ozet')).toContainText('64');
+    await expect(page.locator('.yakinda')).toContainText('A neural network bone segmentation engine is in training at Vimics HQ, will be available at vimics.vet/segmentation, at no charge.');
+    await expect(page.locator('.urun-ad')).toHaveText('V-Seg Engine v1.0');
+    await expect(page.locator('.ray > *').first()).toHaveClass('yakinda');
+    await expect(page.locator('.kup button').first()).toHaveText('Z');
+    await expect(page.locator('body')).not.toContainText('Verify left and right');
+    await expect(page.locator('#ozet')).toContainText('64');
     const volume = parseFloat(await page.locator('#yapilar .hacim').first().innerText());
     const expected = (4 / 3) * Math.PI * 12 ** 3 / 1000;
     expect(Math.abs(volume - expected) / expected).toBeLessThan(0.05);
 
     // Two clicks either side of the centre: by symmetry their true distance is the screen distance.
-    await page.click('[data-yuz="H"]', { force: true });
+    await page.click('[data-yuz="z"]', { force: true });
     await page.waitForTimeout(700);
     const box = (await page.locator('#tuval').boundingBox())!;
     const scaleMm = parseFloat(await page.locator('#olcek-yazi').innerText());
@@ -136,7 +140,7 @@ test.describe('viewer', () => {
     await expect(page.locator('#yapilar li').last().locator('input')).not.toBeChecked();
     await expect(page.locator('#depo')).toBeHidden();
 
-    const tris = () => page.locator('#alt-ozet').innerText();
+    const tris = () => page.locator('#ozet').innerText();
     const before = await tris();
     await page.click('#hazir [data-hu="700"]');
     await expect.poll(tris, { timeout: 30_000 }).not.toBe(before);
@@ -160,7 +164,7 @@ test.describe('viewer', () => {
     await expect(page.locator('#yapilar input:not(:checked)')).toHaveCount(2);
 
     const [download] = await Promise.all([page.waitForEvent('download'), page.click('#goruntu')]);
-    expect(download.suggestedFilename()).toBe('vimics-bone-viewer.png');
+    expect(download.suggestedFilename()).toBe('vimics-v-seg.png');
   });
 });
 
@@ -212,7 +216,7 @@ test.describe('file formats in real workers, under the production security polic
     for (const f of sphereFiles()) entries[`case/${f.name}`] = new Uint8Array(f.buffer);
     await open(page, [{ name: 'case.zip', mimeType: 'application/zip', buffer: Buffer.from(zipSync(entries, { level: 1 })) }]);
     await waitForModel(page);
-    await expect(page.locator('#alt-ozet')).toContainText('64');
+    await expect(page.locator('#ozet')).toContainText('64');
   });
 
   test('picks among series and lets the vet switch', async ({ page }) => {
@@ -222,9 +226,9 @@ test.describe('file formats in real workers, under the production security polic
     await open(page, asFiles([...a, ...b]));
     await waitForModel(page);
     await expect(page.locator('#seri option')).toHaveCount(2);
-    await expect(page.locator('#alt-ozet')).toContainText('64 slices');
+    await expect(page.locator('#ozet')).toContainText('64 slices');
     await page.selectOption('#seri', { index: 1 });
-    await expect(page.locator('#alt-ozet')).toContainText('32 slices', { timeout: 60_000 });
+    await expect(page.locator('#ozet')).toContainText('32 slices', { timeout: 60_000 });
   });
 });
 

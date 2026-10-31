@@ -128,11 +128,12 @@ input[type="checkbox"]:checked::before { background: var(--vurgu-anlamli); }
 .sahne-sol { position: absolute; left: var(--b4); bottom: var(--b3); display: grid; gap: var(--b2); pointer-events: none; }
 .olcek { display: grid; gap: 3px; font: 400 12px/1 var(--mono); color: var(--metin-ikincil); }
 .olcek i { display: block; height: 5px; border: 1px solid var(--metin-ikincil); border-top: 0; }
-.yon-not { font: 400 12px/1.4 var(--mono); color: var(--metin-ikincil); max-width: 36ch; }
+.ozet { font: 400 12px/1.5 var(--mono); color: var(--metin-ikincil); max-width: 76ch; }
+.ozet b { font-weight: 500; color: var(--metin-birincil); }
 
 .kup-kap { position: absolute; right: var(--b4); bottom: var(--b4); width: 64px; height: 64px; perspective: none; }
 .kup { position: absolute; left: 12px; top: 12px; width: 40px; height: 40px; transform-style: preserve-3d; }
-.kup button { position: absolute; inset: 0; display: grid; place-items: center; padding: 0; background: var(--zemin); border: 1px solid var(--kenarlik-kontrol); font: 500 13px/1 var(--mono); color: var(--baslik); cursor: pointer; backface-visibility: hidden; }
+.kup button { position: absolute; inset: 0; display: grid; place-items: center; padding: 0; background: var(--zemin); border: 1px solid var(--kenarlik-kontrol); font: 500 12px/1 var(--mono); color: var(--baslik); cursor: pointer; backface-visibility: hidden; }
 .kup button:hover { background: var(--zemin-yukseltilmis); color: var(--vurgu-anlamli); }
 
 .aksiyon { position: absolute; transform: translate(10px, -50%); display: flex; align-items: center; gap: var(--b2); padding: var(--b1) var(--b1) var(--b1) var(--b3); background: var(--zemin); border: 1px solid var(--kenarlik-kontrol); border-radius: var(--r2); font-size: 13px; white-space: nowrap; }
@@ -168,10 +169,9 @@ input[type="checkbox"]:checked::before { background: var(--vurgu-anlamli); }
 .iyilestir { position: absolute; left: 50%; top: var(--b3); transform: translateX(-50%); display: grid; gap: var(--b1); width: 240px; padding: var(--b2) var(--b3); background: var(--zemin); border: 1px solid var(--kenarlik); border-radius: var(--r2); font-size: 13px; }
 
 /* Footer */
-.alt { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 2px var(--b5); min-height: 32px; padding: var(--b1) var(--b4); background: var(--zemin); border-top: 1px solid var(--ayrac); font: 400 12px/1.4 var(--mono); color: var(--metin-ikincil); }
-.alt-sol, .alt-sag { display: flex; flex-wrap: wrap; gap: 2px var(--b4); }
-.alt-sag strong { font-weight: 500; color: var(--metin-birincil); }
-.alt b { font-weight: 500; color: var(--metin-birincil); }
+.alt { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 2px var(--b4); min-height: 32px; padding: var(--b1) var(--b4); background: var(--zemin); border-top: 1px solid var(--ayrac); font: 400 12px/1.4 var(--mono); color: var(--metin-ikincil); }
+.alt-orta { grid-column: 2; font-weight: 500; color: var(--metin-birincil); text-align: center; }
+.alt-sag { grid-column: 3; justify-self: end; white-space: nowrap; }
 
 /* Start page */
 .baslangic { min-height: 0; overflow-y: auto; background: var(--sahne); }
@@ -212,7 +212,7 @@ input[type="checkbox"]:checked::before { background: var(--vurgu-anlamli); }
 .depo-durum { display: grid; gap: var(--b2); font-size: 13.5px; line-height: 1.45; }
 .depo-durum .cubuk { margin-top: 2px; }
 .depo-ref { font: 500 12.5px/1.4 var(--mono); color: var(--alt-baslik); word-break: break-all; }
-.yakinda { display: grid; gap: var(--b1); margin: var(--b4); padding: var(--b3) var(--b3) var(--b3) var(--b4); background: var(--zemin-yukseltilmis); border: 1px solid var(--kenarlik); border-left: 3px solid var(--vurgu); border-radius: var(--r2); font-size: 13.5px; line-height: 1.45; }
+.yakinda { display: grid; gap: var(--b1); margin: var(--b4) var(--b4) 0; padding: var(--b3) var(--b3) var(--b3) var(--b4); background: var(--zemin-yukseltilmis); border: 1px solid var(--kenarlik); border-left: 3px solid var(--vurgu); border-radius: var(--r2); font-size: 13.5px; line-height: 1.45; }
 .yapilar { max-height: 216px; overflow-y: auto; }
 
 /* Small screens */
@@ -224,7 +224,9 @@ input[type="checkbox"]:checked::before { background: var(--vurgu-anlamli); }
   .calisma { grid-template-columns: 1fr; grid-template-rows: 58vh auto; }
   .sahne { order: -1; }
   .ray { border-right: 0; overflow: visible; }
-  .vaka, .ust-ayrac, .yon-not { display: none; }
+  .vaka, .ust-ayrac { display: none; }
+  .alt { grid-template-columns: minmax(0, 1fr); justify-items: center; }
+  .alt-orta, .alt-sag { grid-column: 1; justify-self: center; }
   .serit { grid-template-columns: 1fr; }
   .serit div + div { padding-left: 0; border-left: 0; border-top: 1px solid var(--ayrac); }
 }

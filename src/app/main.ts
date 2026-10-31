@@ -108,7 +108,6 @@ function show(screen: Screen) {
   $('calisma').style.gridTemplateColumns = screen === 'viewer' ? '' : 'minmax(0, 1fr)';
   const inViewer = screen === 'viewer';
   $('vaka').hidden = !inViewer;
-  $('alt-ozet').hidden = !inViewer;
   const send = $('gonder');
   const realCase = inViewer && !current?.sample;
   send.className = `btn ${realCase ? 'btn-birincil' : 'btn-ikincil'}`;
@@ -229,20 +228,20 @@ $('aksiyon-gizle').addEventListener('click', () => {
 function renderSummary() {
   if (!latestSurface) return;
   const pieces: string[] = [];
-  const item = (strong: string, rest = '') => pieces.push(`<span><b>${strong}</b>${rest}</span>`);
+  const item = (strong: string, rest = '') => pieces.push(`<b>${strong}</b>${rest}`);
   if (current?.sample) {
     item(String(SAMPLE_INFO.slices), ' slices');
     item(`${SAMPLE_INFO.cols} × ${SAMPLE_INFO.rows}`);
-    pieces.push(`<span>Slice <b>${SAMPLE_INFO.spacing} mm</b></span>`);
+    pieces.push(`Slice <b>${SAMPLE_INFO.spacing} mm</b>`);
   } else if (current?.selected) {
     const s = current.selected;
     item(num(s.slices.length), ' slices');
     item(`${s.cols} × ${s.rows}`);
-    pieces.push(`<span>Slice <b>${s.sliceSpacing.toFixed(1)} mm</b></span>`);
+    pieces.push(`Slice <b>${s.sliceSpacing.toFixed(1)} mm</b>`);
   }
-  pieces.push(`<span>Mesh <b>${latestSurface.resolutionMm.toFixed(1)} mm</b></span>`);
-  pieces.push(`<span><b>${num(latestSurface.triangles)}</b> triangles</span>`);
-  $('alt-ozet').innerHTML = pieces.join('');
+  pieces.push(`Mesh <b>${latestSurface.resolutionMm.toFixed(1)} mm</b>`);
+  pieces.push(`<b>${num(latestSurface.triangles)}</b> triangles`);
+  $('ozet').innerHTML = pieces.join(' · ');
 }
 
 function applySurface(result: SurfaceResult) {
@@ -359,7 +358,7 @@ window.addEventListener('keydown', (e) => {
   viewer?.setTool(null);
   $('aksiyon').hidden = true;
 });
-document.querySelectorAll<HTMLButtonElement>('#kup button').forEach((b) => b.addEventListener('click', () => viewer?.viewFrom(b.dataset.yuz ?? 'H')));
+document.querySelectorAll<HTMLButtonElement>('#kup button').forEach((b) => b.addEventListener('click', () => viewer?.viewFrom(b.dataset.yuz ?? 'z')));
 $('sigdir').addEventListener('click', () => viewer?.fit());
 
 $('goruntu').addEventListener('click', async () => {
@@ -368,7 +367,7 @@ $('goruntu').addEventListener('click', async () => {
   const logo = LOGO.replaceAll('var(--logo-monogram)', dark ? '#FFFFFF' : '#26497F').replaceAll('var(--logo-kelime)', '#4CB088');
   const blob = await viewer.snapshot(dark ? '#244870' : '#F7F8FA', dark ? '#C9D2DD' : '#5A6675', logo);
   const a = document.createElement('a');
-  a.download = 'vimics-bone-viewer.png';
+  a.download = 'vimics-v-seg.png';
   a.href = URL.createObjectURL(blob);
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
