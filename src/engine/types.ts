@@ -4,6 +4,12 @@ export type Vec3 = [number, number, number];
 export interface SliceHeader {
   fileIndex: number;
   seriesUid: string;
+  studyUid: string;
+  /** Hash of the patient fields, only for telling two patients apart */
+  patientKey: string;
+  acquisition: string;
+  temporal: string;
+  contrast: boolean;
   modality: string;
   imageType: string[];
   seriesDescription: string;
@@ -32,6 +38,9 @@ export interface SliceHeader {
   burnedIn: boolean;
 }
 
+export type Plane = 'axial' | 'sagittal' | 'coronal' | 'oblique';
+export type FilterFamily = 'bone' | 'soft' | 'lung' | 'unknown';
+
 export interface SeriesInfo {
   id: string;
   description: string;
@@ -47,6 +56,12 @@ export interface SeriesInfo {
   cols: number;
   /** Median distance between slices, in mm */
   sliceSpacing: number;
+  /** Length of the stack along the slice normal, in mm */
+  coverageMm: number;
+  plane: Plane;
+  /** Rebuilt from another series, rather than reconstructed from the raw scan data */
+  reformat: boolean;
+  filter: FilterFamily;
   thickness: number | null;
   pixelSpacing: [number, number] | null;
   rowDir: Vec3;
@@ -80,6 +95,8 @@ export interface MeshData {
 export interface StructureMesh extends MeshData {
   volumeMm3: number;
   autoHidden: boolean;
+  /** Why it was hidden, when it was */
+  hiddenAs: 'table' | 'fragment' | null;
   bboxMin: Vec3;
   bboxMax: Vec3;
 }

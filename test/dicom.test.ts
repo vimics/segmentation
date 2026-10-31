@@ -4,7 +4,9 @@ import { describe, expect, it } from 'vitest';
 import { decodeHounsfield, decodeStoredPixels } from '../src/engine/dicom/decode';
 import { deidentify } from '../src/engine/dicom/deidentify';
 import { parseDataset, readHeader } from '../src/engine/dicom/header';
-import { groupSeries, pickBestSeries } from '../src/engine/dicom/series';
+import { scanSource } from '../src/engine/dicom/scan';
+import { describeSeries, filterFamily, groupSeries, mainReason, mixedUploadWarning, pickBestSeries } from '../src/engine/dicom/series';
+import { HEAD_BYTES } from '../src/engine/io/sniff';
 import { PLANTED, spherePhantom, writeSlice, type SliceSpec, type Syntax } from './phantom';
 
 const fixture = (name: string) => new Uint8Array(readFileSync(resolve(__dirname, 'fixtures', name)));
@@ -71,6 +73,45 @@ describe('decoding phantom slices', () => {
     expect(h.modality).toBe('CT');
     expect((await decodeHounsfield(ds, h))[1]).toBe(spec.hu(1, 0));
   });
+
+  it('reads files with no preamble that use explicit VR', async () => {
+    const spec = small({ syntax: 'explicit', noPreamble: true });
+    const { ds, h } = parse(writeSlice(spec));
+    expect(h.rows).toBe(16);
+    expect((await decodeHounsfield(ds, h))[1]).toBe(spec.hu(1, 0));
+  });
+
+  it('reads files that start with the meta group and have no preamble', async () => {
+    const spec = small({ metaNoPreamble: true });
+    const { ds, h } = parse(writeSlice(spec));
+    expect(h.modality).toBe('CT');
+    expect((await decodeHounsfield(ds, h))[1]).toBe(spec.hu(1, 0));
+  });
+});
+
+describe('scanning a file for its header', () => {
+  const source = (bytes: Uint8Array) => ({ file: new File([bytes as Uint8Array<ArrayBuffer>], 'x'), name: 'x' });
+
+  it('names a stray file without parsing it', async () => {
+    const { kind, ds } = await scanSource(source(new Uint8Array([0x42, 0x4d, 1, 2, 3, 4, 5, 6])));
+    expect(kind).toBe('bmp');
+    expect(ds).toBeNull();
+  });
+
+  it('still finds the geometry when a private block runs past the first bytes', async () => {
+    const { kind, ds } = await scanSource(source(writeSlice(small({ privateBytes: HEAD_BYTES * 2 }))));
+    expect(kind).toBe('dicom');
+    const h = readHeader(ds!, 0)!;
+    expect(h.rows).toBe(16);
+    expect(h.position).toEqual([0, 0, 0]);
+  });
+
+  it('reads the same header from a large slice using only its first bytes', async () => {
+    const big = writeSlice(small({ rows: 512, cols: 512, hu: () => 0 }));
+    const { ds } = await scanSource(source(big));
+    expect(ds!.byteArray.length).toBeLessThanOrEqual(HEAD_BYTES);
+    expect(readHeader(ds!, 0)!.rows).toBe(512);
+  });
 });
 
 describe('series assembly', () => {
@@ -117,6 +158,136 @@ describe('series assembly', () => {
     const series = groupSeries(headers([...a, ...b]));
     expect(series.length).toBe(2);
     expect(pickBestSeries(series)!.slices.length).toBe(40);
+  });
+
+  const stack = (count: number, extra: Partial<SliceSpec>, dz = 1) => Array.from({ length: count }, (_, k) => small({ position: [0, 0, k * dz], instance: k + 1, ...extra }));
+
+  it('keeps the real series when a scout or colour file shares its UID', () => {
+    const slices = stack(10, {});
+    const [series] = groupSeries(headers([...slices, small({ imageType: 'ORIGINAL\\PRIMARY\\LOCALIZER', position: [0, 0, 4.5], instance: 90 })]));
+    expect(series.usable).toBe(true);
+    expect(series.slices.length).toBe(10);
+    expect(series.warnings.join(' ')).toMatch(/1 file in this series could not be used/);
+  });
+
+  it('keeps the name of the series when the first file is the one skipped', () => {
+    const scout = small({ imageType: 'ORIGINAL\\PRIMARY\\LOCALIZER', kernel: 'B40s', instance: 90 });
+    const [series] = groupSeries(headers([scout, ...stack(10, { kernel: 'B70f' })]));
+    expect(series.kernel).toBe('B70f');
+    expect(series.filter).toBe('bone');
+  });
+
+  it('keeps apart reconstructions that differ only in pixel size', () => {
+    const series = groupSeries(headers([...stack(5, { pixelSpacing: [0.5, 0.5] }), ...stack(5, { pixelSpacing: [0.25, 0.25] })]));
+    expect(series.length).toBe(2);
+  });
+
+  it('splits separate regions under one UID, so no surface bridges them', () => {
+    const series = groupSeries(headers([...stack(10, {}), ...stack(10, {}).map((s) => ({ ...s, position: [0, 0, 300 + s.position[2]], instance: s.instance + 50 }))]));
+    expect(series.length).toBe(2);
+    expect(series.map((s) => s.slices.length)).toEqual([10, 10]);
+  });
+
+  it('splits repeated passes over the same anatomy', () => {
+    const series = groupSeries(headers([...stack(8, { temporal: '1' }), ...stack(8, { temporal: '2' })]));
+    expect(series.map((s) => s.slices.length)).toEqual([8, 8]);
+    expect(series.every((s) => s.warnings.every((w) => !/duplicate/.test(w)))).toBe(true);
+  });
+
+  it('keeps one volume when acquisition numbers change but positions do not repeat', () => {
+    // Seen on Hitachi: one 289-slice volume carried four acquisition numbers.
+    const slices = stack(12, {}).map((s, k) => ({ ...s, acquisition: String(1 + (k >> 2)) }));
+    const series = groupSeries(headers(slices));
+    expect(series.length).toBe(1);
+    expect(series[0].slices.length).toBe(12);
+  });
+
+  describe('choosing the default', () => {
+    const named = (uid: string, count: number, extra: Partial<SliceSpec>, dz = 1) => stack(count, { seriesUid: uid, ...extra }, dz);
+    const choose = (...groups: SliceSpec[][]) => pickBestSeries(groupSeries(headers(groups.flat())))!;
+
+    it('matches the TotalSegmentator study: the full scan beats a sharper partial one', () => {
+      const best = choose(named('br', 362, { kernel: 'Br44', description: '' }), named('bl', 136, { kernel: 'Bl64', description: '' }));
+      expect(best.kernel).toBe('Br44');
+      expect(best.slices.length).toBe(362);
+    });
+
+    it('takes the bone filter when both cover the scan', () => {
+      expect(choose(named('s', 200, { kernel: 'B31s', description: '' }), named('b', 190, { kernel: 'B70f', description: '' })).kernel).toBe('B70f');
+    });
+
+    it('does not let a partial bone series hide the full scan', () => {
+      expect(choose(named('s', 300, { kernel: 'B31s', description: '' }), named('b', 100, { kernel: 'B70f', description: '' })).kernel).toBe('B31s');
+    });
+
+    it('prefers the reconstruction over a reformat with as much coverage', () => {
+      const best = choose(named('o', 766, { kernel: 'I80s', description: '', imageType: 'ORIGINAL\\PRIMARY\\AXIAL\\CT_SOM5 SPI' }), named('m', 800, { kernel: 'I80s', description: '', imageType: 'DERIVED\\PRIMARY\\AXIAL\\CT_SOM5 MPR' }));
+      expect(best.slices.length).toBe(766);
+      expect(best.reformat).toBe(false);
+    });
+
+    it('accepts a reformat when the upload has nothing else, as one real case did', () => {
+      const best = choose(named('m', 708, { kernel: 'B70f', description: '', imageType: 'DERIVED\\PRIMARY\\AXIAL\\CT_SOM5 MPR' }));
+      expect(best.slices.length).toBe(708);
+    });
+
+    it('does not count DERIVED alone as a reformat, because main series are often marked that way', () => {
+      const best = choose(named('m', 289, { kernel: '42', description: 'BILAT BONE', imageType: 'DERIVED\\SECONDARY\\\\POST_RECON' }), named('r', 51, { kernel: '42', description: 'BONE', imageType: 'DERIVED\\SECONDARY\\\\MPR' }));
+      expect(best.slices.length).toBe(289);
+      expect(best.reformat).toBe(false);
+    });
+
+    it('prefers pre-contrast when everything else is equal', () => {
+      expect(choose(named('post', 50, { kernel: 'B70f', contrast: 'IOHEXOL' }), named('pre', 50, { kernel: 'B70f' })).slices[0].contrast).toBe(false);
+    });
+  });
+
+  it('takes the plane from the orientation, not from words in the description', () => {
+    const sagittal = stack(5, { orientation: [0, 1, 0, 0, 0, -1], description: 'Ax' });
+    expect(groupSeries(headers(sagittal))[0].plane).toBe('sagittal');
+    // "SAG" here is Turkish for right, on an axial series.
+    expect(groupSeries(headers(stack(5, { description: 'SAG ON EKSTREMITE' })))[0].plane).toBe('axial');
+    const oblique = stack(5, { orientation: [0.77, 0.63, 0.1, 0.14, 0, -0.99] });
+    expect(groupSeries(headers(oblique))[0].plane).toBe('oblique');
+  });
+
+  it.each([
+    ['Br44', '', 'soft'], ['Bl64', '', 'lung'], ['B70f', '', 'bone'], ['I80s', '', 'bone'], ['I31s', '', 'soft'], ['Hr64', '', 'bone'], ['Ur77', '', 'bone'],
+    ['BONE', '', 'bone'], ['BONEPLUS', '', 'bone'], ['STANDARD', '', 'soft'], ['LUNG', '', 'lung'], ['FC30', '', 'bone'],
+    ['42', 'BILAT ON EKSTREMITE BONE', 'bone'], ['31', 'BILAT ON EKSTREMITE', 'unknown'], ['', '', 'unknown'],
+  ])('filter %s with description "%s" is %s', (kernel, description, family) => {
+    expect(filterFamily(kernel, description)).toBe(family);
+  });
+
+  it('names rows plainly and never guesses a filter', () => {
+    const all = groupSeries(headers([
+      ...stack(100, { seriesUid: 'b', kernel: 'Hr64', description: '' }),
+      ...stack(30, { seriesUid: 'l', kernel: 'Bl64', description: '' }),
+      ...stack(100, { seriesUid: 'u', kernel: '', description: '' }),
+      ...stack(20, { seriesUid: 'n', kernel: '31', description: '', imageType: 'DERIVED\\SECONDARY\\\\MPR', orientation: [0, 1, 0, 0, 0, -1] }).map((s, k) => ({ ...s, position: [k, 0, 0] })),
+    ]));
+    const row = (uid: string) => describeSeries(all.find((s) => s.slices[0].seriesUid === uid)!, all);
+    expect(row('b')).toBe('Bone filter (Hr64) · Full scan · 1.0 mm · 100 slices');
+    expect(row('l')).toBe('Lung filter (Bl64) · Partial scan · 1.0 mm · 30 slices');
+    expect(row('u')).toBe('CT series · Full scan · 1.0 mm · 100 slices');
+    expect(row('n')).toBe('Filter 31 · Sagittal reformat · 1.0 mm · 20 slices');
+  });
+
+  it('blames the main series, not a stray dose report, when nothing can be used', () => {
+    const lossy = stack(40, { seriesUid: 'c', samples: 3 });
+    const dose = [small({ seriesUid: 'd', modality: 'SR' })];
+    const series = groupSeries(headers([...dose, ...lossy]));
+    expect(pickBestSeries(series)).toBeNull();
+    expect(mainReason(series)).toMatch(/colour/);
+  });
+
+  it('points out a mixed upload', () => {
+    const one = stack(5, {});
+    expect(mixedUploadWarning(groupSeries(headers(one)))).toBeNull();
+    const twoStudies = groupSeries(headers([...one, ...stack(5, { seriesUid: '9', studyUid: '1.2.9' })]));
+    expect(mixedUploadWarning(twoStudies)).toMatch(/2 separate studies/);
+    const twoPatients = groupSeries(headers([...one, ...stack(5, { seriesUid: '9', studyUid: '1.2.9', patientName: 'OTHER^PATIENT' })]));
+    expect(mixedUploadWarning(twoPatients)).toMatch(/2 different patients/);
   });
 });
 

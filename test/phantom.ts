@@ -145,6 +145,18 @@ export interface SliceSpec {
   imageType?: string;
   burnedIn?: boolean;
   noPreamble?: boolean;
+  /** Starts with the file meta group, with no 128-byte preamble */
+  metaNoPreamble?: boolean;
+  kernel?: string;
+  description?: string;
+  studyUid?: string;
+  patientName?: string;
+  acquisition?: string;
+  temporal?: string;
+  contrast?: string;
+  samples?: number;
+  /** Size of a private block before the pixel data, to push them far into the file */
+  privateBytes?: number;
 }
 
 export function writeSlice(s: SliceSpec): Uint8Array {
@@ -172,24 +184,24 @@ export function writeSlice(s: SliceSpec): Uint8Array {
     [0x0008, 0x0080, 'LO', PLANTED.clinic],
     [0x0008, 0x0081, 'ST', PLANTED.address],
     [0x0008, 0x0090, 'PN', PLANTED.referring],
-    [0x0008, 0x103e, 'LO', `Bone ${PLANTED.note}`],
+    [0x0008, 0x103e, 'LO', s.description ?? `Bone ${PLANTED.note}`],
     [0x0008, 0x1090, 'LO', 'TestModel'],
     [0x0009, 0x0010, 'LO', 'PRIVATECREATOR'],
     [0x0009, 0x1001, 'LO', PLANTED.privateTag],
-    [0x0010, 0x0010, 'PN', PLANTED.owner],
+    [0x0010, 0x0010, 'PN', s.patientName ?? PLANTED.owner],
     [0x0010, 0x0020, 'LO', 'PLANTEDID'],
     [0x0010, 0x2201, 'LO', 'Canine'],
     [0x0010, 0x2292, 'LO', 'Beagle'],
     [0x0010, 0x2297, 'PN', PLANTED.owner],
     [0x0010, 0x4000, 'LT', PLANTED.note],
     [0x0018, 0x0050, 'DS', '0.5'],
-    [0x0018, 0x1210, 'SH', 'BONE'],
-    [0x0020, 0x000d, 'UI', `${PLANTED.uid}.100`],
+    [0x0018, 0x1210, 'SH', s.kernel ?? 'BONE'],
+    [0x0020, 0x000d, 'UI', s.studyUid ?? `${PLANTED.uid}.100`],
     [0x0020, 0x000e, 'UI', s.seriesUid ?? `${PLANTED.uid}.200`],
     [0x0020, 0x0013, 'IS', String(s.instance)],
     [0x0020, 0x0032, 'DS', s.position.join('\\')],
     [0x0020, 0x0037, 'DS', (s.orientation ?? [1, 0, 0, 0, 1, 0]).join('\\')],
-    [0x0028, 0x0002, 'US', u16(1, le)],
+    [0x0028, 0x0002, 'US', u16(s.samples ?? 1, le)],
     [0x0028, 0x0004, 'CS', 'MONOCHROME2'],
     [0x0028, 0x0010, 'US', u16(s.rows, le)],
     [0x0028, 0x0011, 'US', u16(s.cols, le)],
@@ -202,6 +214,10 @@ export function writeSlice(s: SliceSpec): Uint8Array {
     [0x0028, 0x1053, 'DS', '1'],
   ];
   if (s.burnedIn) attrs.push([0x0028, 0x0301, 'CS', 'YES']);
+  if (s.acquisition) attrs.push([0x0020, 0x0012, 'IS', s.acquisition]);
+  if (s.temporal) attrs.push([0x0020, 0x0100, 'IS', s.temporal]);
+  if (s.contrast) attrs.push([0x0018, 0x0010, 'LO', s.contrast]);
+  if (s.privateBytes) attrs.push([0x0029, 0x0010, 'LO', 'PRIVATECREATOR'], [0x0029, 0x1010, 'OB', new Uint8Array(s.privateBytes)]);
   attrs.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
   for (const [g, e, vr, v] of attrs) body.attr(g, e, vr, v);
 
@@ -225,7 +241,7 @@ export function writeSlice(s: SliceSpec): Uint8Array {
   const file = new Out(true, true);
   const pre = new Uint8Array(132);
   pre.set([0x44, 0x49, 0x43, 0x4d], 128);
-  file.raw(pre);
+  if (!s.metaNoPreamble) file.raw(pre);
   const len = new Uint8Array(4);
   new DataView(len.buffer).setUint32(0, metaBytes.length, true);
   file.attr(0x0002, 0x0000, 'UL', len);

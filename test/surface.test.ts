@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildSampleVolume } from '../src/engine/sample/bone';
+import { profileDensity, startingThreshold, thresholdPresets } from '../src/engine/surface/density';
 import { SurfaceEngine } from '../src/engine/surface/pipeline';
 import type { StructureMesh, Vec3, Volume } from '../src/engine/types';
 
@@ -138,5 +139,85 @@ describe('levels', () => {
     const { structures, triangles } = new SurfaceEngine(volumeFrom({ hu: sphere([20, 20, 20], 12) })).full(2000);
     expect(structures.length).toBe(0);
     expect(triangles).toBe(0);
+  });
+
+  it('never exceeds the triangle budget on noisy scans, where the estimate falls short', () => {
+    let seed = 1;
+    const noise = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    const volume = volumeFrom({ nx: 160, ny: 160, nz: 100, hu: () => (noise() > 0.5 ? 1000 : -1000) });
+    // Roomy enough for the estimate of four times the preview, but not for what noise really produces.
+    const budget = new SurfaceEngine(volume).preview(250).triangles * 5;
+    const engine = new SurfaceEngine(volume, budget);
+    engine.preview(250);
+    const full = engine.full(250);
+    expect(full.triangles).toBeLessThanOrEqual(budget);
+    expect(full.resolutionMm).toBeGreaterThan(0.5);
+  });
+});
+
+describe('hiding what is not bone', () => {
+  it('hides a thin curved shell, the way table pieces and tubing look on real scans', () => {
+    // A hollow sphere with a 0.4 mm wall: solid enough to survive, far too thin to be a bone this size.
+    const scene = (x: number, y: number, z: number) => {
+      const d = Math.hypot(x - 14, y - 14, z - 14);
+      return Math.max(d > 10 && d < 10.4 ? 1000 : -1000, sphere([32, 32, 32], 6)(x, y, z));
+    };
+    const { structures } = new SurfaceEngine(volumeFrom({ nx: 160, ny: 160, nz: 160, dx: 0.25, dy: 0.25, zAt: (k) => k * 0.25, hu: scene })).full(250);
+    const hidden = structures.filter((s) => s.autoHidden);
+    expect(hidden.length).toBeGreaterThan(0);
+    expect(hidden.every((s) => s.hiddenAs === 'fragment')).toBe(true);
+    expect(structures.filter((s) => !s.autoHidden).length).toBe(1);
+  });
+
+  it('keeps a small solid bone', () => {
+    const volume = volumeFrom({ hu: (x, y, z) => {
+      const big = sphere([12, 12, 12], 8)(x, y, z), small = sphere([30, 30, 30], 2)(x, y, z);
+      return Math.max(big, small);
+    } });
+    const { structures } = new SurfaceEngine(volume).full(250);
+    expect(structures.length).toBe(2);
+    expect(structures.every((s) => !s.autoHidden)).toBe(true);
+  });
+});
+
+describe('starting threshold', () => {
+  const scan = (values: Array<[number, number]>): Volume => {
+    const data = new Int16Array(values.reduce((n, [, c]) => n + c, 0));
+    let i = 0;
+    for (const [v, c] of values) { data.fill(v, i, i + c); i += c; }
+    return { nx: data.length, ny: 1, nz: 1, data, positions: new Float64Array(3), rowDir: [1, 0, 0], colDir: [0, 1, 0], dx: 1, dy: 1 };
+  };
+
+  it('stays at 250 for a calibrated scan with a standard filter', () => {
+    const p = profileDensity(scan([[-1000, 9000], [40, 900], [800, 100]]));
+    expect(p.offsetScale).toBe(false);
+    expect(p.tissuePeak).toBe(0);
+    expect(startingThreshold(p, 'soft')).toBe(250);
+    expect(startingThreshold(p, 'unknown')).toBe(250);
+  });
+
+  it('starts higher with a sharp filter, which overshoots at tissue edges', () => {
+    const p = profileDensity(scan([[-1000, 9000], [40, 900], [800, 100]]));
+    expect(startingThreshold(p, 'bone')).toBe(500);
+    expect(thresholdPresets(500, p)).toEqual([500, 700, 1100]);
+  });
+
+  it('finds the offset scale of a cone-beam scan, from its own tissue peak', () => {
+    const p = profileDensity(scan([[-1024, 8000], [1100, 1600], [50, 100], [2400, 200]]));
+    expect(p.offsetScale).toBe(true);
+    expect(p.tissuePeak).toBe(1100);
+    expect(startingThreshold(p, 'unknown')).toBe(2000);
+    expect(thresholdPresets(2000, p)).toEqual([2000, 2400, 2800]);
+  });
+
+  it('is not fooled by a crop that is mostly bone on a calibrated scanner', () => {
+    const p = profileDensity(scan([[-1000, 4000], [900, 3000], [40, 2500]]));
+    expect(p.tissuePeak).toBe(900);
+    expect(p.offsetScale).toBe(false);
+  });
+
+  it('stays within the slider', () => {
+    expect(startingThreshold({ tissuePeak: 1950, offsetScale: true }, 'unknown')).toBe(2850);
+    expect(thresholdPresets(2850, { tissuePeak: 1950, offsetScale: true })).toEqual([2850, 3000, 3000]);
   });
 });

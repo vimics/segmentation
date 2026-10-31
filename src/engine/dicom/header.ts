@@ -31,12 +31,24 @@ function hasPreamble(bytes: Uint8Array): boolean {
   return bytes.length > 132 && bytes[128] === 0x44 && bytes[129] === 0x49 && bytes[130] === 0x43 && bytes[131] === 0x4d;
 }
 
-/** Older exports leave out the preamble; they start directly with a low group number. */
-function looksLikeBareDataset(bytes: Uint8Array): boolean {
-  if (bytes.length < 16) return false;
-  const group = bytes[0] | (bytes[1] << 8);
-  return group === 0x0008 && bytes[3] === 0;
+const isUpper = (c: number) => c >= 0x41 && c <= 0x5a;
+
+/** Older exports leave out the preamble. They start with the file meta group or directly with the dataset. */
+function bareForm(bytes: Uint8Array): 'meta' | 'explicit' | 'implicit' | null {
+  if (bytes.length < 16 || bytes[1] !== 0 || bytes[3] !== 0) return null;
+  if (bytes[0] === 0x02) return 'meta';
+  if (bytes[0] !== 0x08) return null;
+  return isUpper(bytes[4]) && isUpper(bytes[5]) ? 'explicit' : 'implicit';
 }
+
+function withPreamble(bytes: Uint8Array): Uint8Array {
+  const out = new Uint8Array(132 + bytes.length);
+  out.set([0x44, 0x49, 0x43, 0x4d], 128);
+  out.set(bytes, 132);
+  return out;
+}
+
+export const looksLikeDicom = (bytes: Uint8Array) => hasPreamble(bytes) || bareForm(bytes) !== null;
 
 export type ParseOptions = { headerOnly?: boolean };
 
@@ -44,15 +56,25 @@ export type ParseOptions = { headerOnly?: boolean };
 export function parseDataset(bytes: Uint8Array, opts: ParseOptions = {}): dicomParser.DataSet | null {
   const options: dicomParser.ParseDicomOptions & { inflater?: unknown } = { inflater };
   if (opts.headerOnly) options.untilTag = 'x7fe00010';
+  let input = bytes;
   if (!hasPreamble(bytes)) {
-    if (!looksLikeBareDataset(bytes)) return null;
-    (options as { TransferSyntaxUID?: string }).TransferSyntaxUID = TS.IMPLICIT_LE;
+    const form = bareForm(bytes);
+    if (!form) return null;
+    if (form === 'meta') input = withPreamble(bytes);
+    else (options as { TransferSyntaxUID?: string }).TransferSyntaxUID = form === 'explicit' ? TS.EXPLICIT_LE : TS.IMPLICIT_LE;
   }
   try {
-    return dicomParser.parseDicom(bytes, options as dicomParser.ParseDicomOptions);
+    return dicomParser.parseDicom(input, options as dicomParser.ParseDicomOptions);
   } catch {
     return null;
   }
+}
+
+/** A short hash, enough to tell two patients apart without keeping their names in memory. */
+function fingerprint(text: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
+  return (h >>> 0).toString(16);
 }
 
 const numbers = (s: string | undefined): number[] =>
@@ -74,6 +96,11 @@ export function readHeader(ds: dicomParser.DataSet, fileIndex: number): SliceHea
   return {
     fileIndex,
     seriesUid: seriesUid ?? 'unknown',
+    studyUid: (ds.string('x0020000d') ?? '').trim(),
+    patientKey: fingerprint(`${ds.string('x00100010') ?? ''}|${ds.string('x00100020') ?? ''}`),
+    acquisition: (ds.string('x00200012') ?? '').trim(),
+    temporal: (ds.string('x00200100') ?? '').trim(),
+    contrast: !!(ds.string('x00180010') ?? '').trim(),
     modality: (ds.string('x00080060') ?? '').trim().toUpperCase(),
     imageType: (ds.string('x00080008') ?? '').split('\\').map((v) => v.trim().toUpperCase()),
     seriesDescription: (ds.string('x0008103e') ?? '').trim(),

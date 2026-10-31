@@ -32,8 +32,8 @@ Viewer header order: `Patient Name · Cat or Dog · Breed · Age · Weight kg ·
 
 ## Pipeline
 
-1. **Ingest:** folder, loose files or ZIP. DICOM is detected from content, not the file extension.
-2. **Parse and group:** split by series, position and matrix. Exclude localisers and non-CT. Auto-select the best series, with a picker.
+1. **Ingest:** folder, loose files or ZIP, including nested and self-extracting ZIPs. Every file is named from its content. Programs, pictures and damaged archives are skipped, and only the first bytes of each are read. See `docs/REAL-CASES.md`.
+2. **Parse and group:** split by series, matrix, plane, pixel size, large gaps and repeated passes. One odd file never loses a series. The default is the bone-filter series with the most files if it covers at least 90% of the longest series, otherwise the series with the most files. Reconstructions beat reformats. Other usable series stay selectable under plain names, and scouts and dose reports are never listed.
 3. **Decode:** uncompressed (implicit, explicit, big endian, deflated), RLE, JPEG Lossless, JPEG-LS and JPEG 2000. Rescale to Hounsfield units.
 4. **Build the volume:** sort slices along the slice normal. Vertices use each slice's own position, so uneven spacing and gantry tilt stay correct in true millimetres. No resampling.
 5. **Extract the surface:** marching cubes. Half-resolution preview first, then full. A triangle budget chooses the level, and the footer states the mesh resolution.
@@ -49,13 +49,15 @@ Viewer header order: `Patient Name · Cat or Dog · Breed · Age · Weight kg ·
 4. The browser uploads 5 MiB chunks with retry and resume. If SharePoint refuses direct browser requests, it relays chunks through the Worker.
 5. The sidebar shows real progress and a case reference, which a vet can quote to request deletion.
 
+Demo cases open with no form and no storage. They hold only voxels and geometry, cropped to the bones.
+
 Storage layout: `BoneViewer/YYYY/MM/<caseId>/case.json` and `series.zip`.
 
 Abuse controls on the public endpoint: origin allow-list, size cap, per-address rate limit, optional bot check and optional access code during testing. The Microsoft app is limited to one dedicated SharePoint site.
 
 ## Clinical accuracy rules
 
-- Bone preset starts at about 250 HU and is tuned on real cases. The slider is always available.
+- The threshold starts at 500 HU for sharp bone filters and 250 HU for others. Scans off the usual scale, as on cone-beam scanners, start from their own tissue peak, with a notice. The slider is always available, and switching series keeps its value.
 - The cube and clip controls use plain X, Y and Z axes, so the screen makes no left or right claim. Handedness has its own test.
 - Series with irregular spacing, missing slices or thick slices show a warning. Missing position data stops the load with a clear message.
 - Series flagged as having burned-in annotations are not uploaded.
@@ -67,7 +69,7 @@ Abuse controls on the public endpoint: origin allow-list, size cap, per-address 
 - De-identification: planted owner and clinic strings must not appear anywhere in the output, and pixels must be unchanged.
 - Worker: tests against a simulated Microsoft Graph.
 - End to end in a browser: fill the form, load a CT, see a mesh, measure, snapshot, and confirm the uploaded ZIP is clean.
-- Real cases: run on supplied veterinary series for thresholds, table removal, timing and orientation.
+- Real cases: `docs/REAL-CASES.md`, with the tools to repeat each check.
 
 ## Out of v1
 

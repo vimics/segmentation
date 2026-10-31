@@ -110,21 +110,34 @@ export function splitStructures(mesh: MeshData, extent: { lengthMm: number }): {
       }
     });
     const volumeMm3 = g.children.reduce((sum, c) => sum + c.signedVolume, g.signedVolume);
+    const hiddenAs = looksLikeTable(g, volumeMm3, extent.lengthMm) ? 'table' as const : looksLikeFragment(g, volumeMm3) ? 'fragment' as const : null;
     return {
       positions, normals, colors,
       indices: Uint32Array.from(triLists.get(g) as number[]),
       volumeMm3,
-      autoHidden: looksLikeTable(g, volumeMm3, extent.lengthMm),
+      autoHidden: hiddenAs !== null,
+      hiddenAs,
       bboxMin: g.min,
       bboxMax: g.max,
     };
   });
 
   // If everything looks like a table, the guess is wrong; show what there is.
-  if (structures.length && structures.every((s) => s.autoHidden)) for (const s of structures) s.autoHidden = false;
+  if (structures.length && structures.every((s) => s.autoHidden)) for (const s of structures) { s.autoHidden = false; s.hiddenAs = null; }
   // Hidden guesses go last, so the list starts with the bones.
   structures.sort((x, y) => Number(x.autoHidden) - Number(y.autoHidden));
   return { structures, specksRemoved };
+}
+
+/**
+ * Mean thickness below which a piece is a skin of noise, not bone. On real scans table pieces, tubing and noise
+ * measured 0.1 to 0.5 mm, and the smallest real bones 0.8 mm or more.
+ */
+const FRAGMENT_THICKNESS_MM = 0.5;
+
+function looksLikeFragment(g: Group, volumeMm3: number): boolean {
+  const area = g.children.reduce((sum, c) => sum + c.area, g.area);
+  return area > 0 && (2 * volumeMm3) / area < FRAGMENT_THICKNESS_MM;
 }
 
 /** A CT table is a thin shell running the full length of the scan. Bones are thicker or shorter. */

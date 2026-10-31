@@ -233,6 +233,83 @@ test.describe('file formats in real workers, under the production security polic
     await page.selectOption('#seri', { index: 1 });
     await expect(page.locator('#ozet')).toContainText('32 slices', { timeout: 60_000 });
   });
+
+  test('switching series keeps the chosen threshold, and a new case resets it', async ({ page }) => {
+    await fakeStorage(page);
+    const a = spherePhantom({ radiusMm: 12, count: 64 }).slices.map((s) => ({ ...s, seriesUid: '1.2.3.1' }));
+    const b = spherePhantom({ radiusMm: 6, size: 32, count: 32 }).slices.map((s) => ({ ...s, seriesUid: '1.2.3.2', instance: s.instance + 1000 }));
+    await open(page, asFiles([...a, ...b]));
+    await waitForModel(page);
+    await page.fill('#esik-sayi', '400');
+    await page.locator('#esik-sayi').blur();
+    await page.selectOption('#seri', { index: 1 });
+    await expect(page.locator('#ozet')).toContainText('32 slices', { timeout: 60_000 });
+    await expect(page.locator('#esik-sayi')).toHaveValue('400');
+  });
+
+  test('one usable series shows no choice, and scouts and dose reports are never listed', async ({ page }) => {
+    await fakeStorage(page);
+    const main = spherePhantom({ radiusMm: 12 }).slices.map((s) => ({ ...s, seriesUid: '1.2.3.1', kernel: 'B70f', description: 'Spine' }));
+    const scout = { ...main[0], seriesUid: '1.2.3.2', imageType: 'ORIGINAL\\PRIMARY\\LOCALIZER', instance: 900 };
+    const dose = { ...main[0], seriesUid: '1.2.3.3', samples: 3, instance: 901 };
+    await open(page, asFiles([scout, dose, ...main]));
+    await waitForModel(page);
+    await expect(page.locator('#seri')).toBeHidden();
+    await expect(page.locator('#seri-bilgi')).toHaveText('Bone filter (B70f) · Full scan · 0.5 mm · 64 slices · Spine');
+  });
+
+  test('a real-world mix loads: DICOM with BMP copies, a viewer program and a readme', async ({ page }) => {
+    await fakeStorage(page);
+    const bmp = Buffer.alloc(5000, 1);
+    bmp.write('BM');
+    const exe = Buffer.alloc(5000, 2);
+    exe.write('MZ');
+    const strays = [
+      ...Array.from({ length: 5 }, (_, i) => ({ name: `IMG${i}.bmp`, mimeType: 'image/bmp', buffer: bmp })),
+      { name: 'pdsv.exe', mimeType: 'application/octet-stream', buffer: exe },
+      { name: 'README.txt', mimeType: 'text/plain', buffer: Buffer.from('Insert the disc and run the viewer.') },
+      { name: 'autorun.inf', mimeType: 'text/plain', buffer: Buffer.from('[autorun]') },
+    ];
+    await open(page, [...strays, ...sphereFiles().map((f, i) => ({ ...f, name: `I${i}` }))]);
+    await waitForModel(page);
+    await expect(page.locator('#ozet')).toContainText('64');
+  });
+
+  test('a damaged ZIP beside good files becomes a warning', async ({ page }) => {
+    await fakeStorage(page);
+    await open(page, [{ name: 'broken.zip', mimeType: 'application/zip', buffer: Buffer.from(zipSync({ a: new Uint8Array(40) }).subarray(0, 30)) }, ...sphereFiles()]);
+    await waitForModel(page);
+    await expect(page.locator('#uyarilar')).toContainText('1 ZIP file inside this upload could not be read');
+  });
+
+  test('a corrupt slice is left out with a warning', async ({ page }) => {
+    await fakeStorage(page);
+    const files = sphereFiles();
+    // Cuts the file in the pixel data: the header is still readable, the slice is not.
+    files[20] = { ...files[20], buffer: files[20].buffer.subarray(0, files[20].buffer.length - 3000) };
+    await open(page, files);
+    await waitForModel(page);
+    await expect(page.locator('#uyarilar')).toContainText('1 slice could not be read');
+    await expect(page.locator('#ozet')).toContainText('63');
+  });
+});
+
+test.describe('demo cases', () => {
+  for (const [name, species] of [['Cat 1', 'Cat'], ['Cat 2', 'Cat'], ['Dog 1', 'Dog'], ['Dog 2', 'Dog']]) {
+    test(`${name} opens with no form, and nothing is sent`, async ({ page }) => {
+      const problems = collectProblems(page);
+      const outgoing: string[] = [];
+      page.on('request', (r) => { if (!r.url().startsWith('http://localhost') && !r.url().startsWith('blob:') && !r.url().startsWith('data:')) outgoing.push(r.url()); });
+      await page.goto('/');
+      await page.getByRole('button', { name, exact: true }).click();
+      await page.locator('#yapilar li').first().waitFor({ timeout: 85_000 });
+      await expect(page.locator('#vaka')).toContainText('Patient details removed');
+      await expect(page.locator('#seri-bilgi')).toHaveText(`Demo case · ${species}`);
+      await expect(page.locator('#depo')).toBeHidden();
+      expect(outgoing).toEqual([]);
+      expect(problems).toEqual([]);
+    });
+  }
 });
 
 test.describe('clear messages', () => {
@@ -247,6 +324,19 @@ test.describe('clear messages', () => {
   test('files that are not DICOM are reported', async ({ page }) => {
     await open(page, [{ name: 'photo.jpg', mimeType: 'image/jpeg', buffer: Buffer.alloc(2000, 7) }]);
     await expect(page.locator('#hata-baslik')).toHaveText('No DICOM images in these files');
+  });
+
+  test('a folder of BMP pictures says what it found', async ({ page }) => {
+    const bmp = Buffer.alloc(5000, 1);
+    bmp.write('BM');
+    await open(page, Array.from({ length: 12 }, (_, i) => ({ name: `IMG${i}.bmp`, mimeType: 'image/bmp', buffer: bmp })));
+    await expect(page.locator('#hata-metin')).toContainText('12 pictures');
+    await expect(page.locator('#hata-metin')).toContainText('no density data');
+  });
+
+  test('a RAR archive is named and the vet is told to unpack it', async ({ page }) => {
+    await open(page, [{ name: 'scan.rar', mimeType: 'application/octet-stream', buffer: Buffer.concat([Buffer.from('Rar!'), Buffer.alloc(100, 3)]) }]);
+    await expect(page.locator('#hata-metin')).toContainText('RAR archive');
   });
 
   test('warns about missing slices', async ({ page }) => {

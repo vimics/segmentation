@@ -1,13 +1,15 @@
-import { describeSeries, pickBestSeries } from '../engine/dicom/series';
+import { describeSeries, mainReason, mixedUploadWarning, pickBestSeries } from '../engine/dicom/series';
 import { toSources, type Source } from '../engine/io/sources';
 import { assembleVolume, scanSeries } from '../engine/load';
+import { fetchDemo } from '../engine/demo';
 import { SAMPLE_INFO } from '../engine/sample/bone';
 import type { SeriesInfo, StructureMesh, SurfaceResult, Vec3 } from '../engine/types';
+import { profileDensity, startingThreshold, thresholdPresets, type DensityProfile } from '../engine/surface/density';
 import { Viewer, type MeasureKind, type Measurement } from '../engine/viewer/viewer';
 import type { MeshRequest } from '../engine/workers/mesh.worker';
 import { CaseStore, type StoreRequest, type StoreState } from './caseStore';
 import { caseLine, formatStudyDate, speciesConflict, validateDetails, type CaseDetails, type RawDetails } from './details';
-import { filesFromDrop } from './ingest';
+import { explainNoDicom, filesFromDrop, ingestWarnings } from './ingest';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const num = (n: number) => n.toLocaleString('en-GB');
@@ -90,6 +92,7 @@ for (const [input, field] of [['f-name', 'name'], ['f-years', 'age'], ['f-months
   $(input).addEventListener('input', () => setFieldError(field));
 }
 $('ornek').addEventListener('click', () => void openSample());
+document.querySelectorAll<HTMLButtonElement>('[data-demo]').forEach((b) => b.addEventListener('click', () => void openDemo(b.dataset.demo as string, b.textContent ?? '')));
 
 // ---- Screens ----------------------------------------------------------------------------------
 
@@ -134,7 +137,7 @@ function setStep(active: number, counter?: string, overall?: number) {
 
 let viewer: Viewer | null = null;
 let meshWorker: Worker | null = null;
-let current: { details: CaseDetails | null; acceptedAt: string; sources: Source[]; series: SeriesInfo[]; selected: SeriesInfo | null; sample: boolean } | null = null;
+let current: { details: CaseDetails | null; acceptedAt: string; sources: Source[]; series: SeriesInfo[]; selected: SeriesInfo | null; sample: boolean; uploadWarnings: string[] } | null = null;
 let iso = DEFAULT_ISO;
 let seq = 0;
 let latestSurface: Omit<SurfaceResult, 'structures'> & { structures: StructureMesh[] } | null = null;
@@ -177,7 +180,7 @@ function renderStructures() {
   if (!latestSurface) return;
   let n = 0;
   latestSurface.structures.forEach((s, i) => {
-    const name = s.autoHidden ? 'Likely scanner table' : `Structure ${++n}`;
+    const name = s.hiddenAs === 'table' ? 'Likely scanner table' : s.hiddenAs === 'fragment' ? 'Thin fragment' : `Structure ${++n}`;
     const li = document.createElement('li');
     li.className = visibility[i] ? '' : 'kapali';
     const box = document.createElement('input');
@@ -225,17 +228,20 @@ $('aksiyon-gizle').addEventListener('click', () => {
   selectedStructure = null;
 });
 
+/** What the summary states for the generated sample or a demo case. */
+let exampleInfo: { slices: number; cols: number; rows: number; spacing: number | string } = SAMPLE_INFO;
+
 function renderSummary() {
   if (!latestSurface) return;
   const pieces: string[] = [];
   const item = (strong: string, rest = '') => pieces.push(`<b>${strong}</b>${rest}`);
   if (current?.sample) {
-    item(String(SAMPLE_INFO.slices), ' slices');
-    item(`${SAMPLE_INFO.cols} × ${SAMPLE_INFO.rows}`);
-    pieces.push(`Slice <b>${SAMPLE_INFO.spacing} mm</b>`);
+    item(num(exampleInfo.slices), ' slices');
+    item(`${exampleInfo.cols} × ${exampleInfo.rows}`);
+    pieces.push(`Slice <b>${exampleInfo.spacing} mm</b>`);
   } else if (current?.selected) {
     const s = current.selected;
-    item(num(s.slices.length), ' slices');
+    item(num(builtSlices), ' slices');
     item(`${s.cols} × ${s.rows}`);
     pieces.push(`Slice <b>${s.sliceSpacing.toFixed(1)} mm</b>`);
   }
@@ -284,6 +290,14 @@ function syncSlider(el: HTMLInputElement) {
 function requestSurface(quality: 'preview' | 'full') {
   const msg: MeshRequest = { type: 'extract', seq: ++seq, iso, quality };
   meshWorker?.postMessage(msg);
+}
+
+function setPresets(start: number, profile: DensityProfile) {
+  const values = thresholdPresets(start, profile);
+  document.querySelectorAll<HTMLButtonElement>('#hazir button').forEach((b, i) => {
+    b.dataset.hu = String(values[i]);
+    b.querySelector('small')!.textContent = String(values[i]);
+  });
 }
 
 function setIsoControls(value: number) {
@@ -436,7 +450,7 @@ function storeCurrent() {
 
 // ---- Loading a case ---------------------------------------------------------------------------
 
-function resetForNewModel() {
+function resetForNewModel(keepThreshold = false) {
   meshWorker?.terminate();
   meshWorker = null;
   latestSurface = null;
@@ -450,7 +464,7 @@ function resetForNewModel() {
   $('uyarilar').replaceChildren();
   viewer?.setTool(null);
   viewer?.clearMeasurements();
-  setIsoControls(DEFAULT_ISO);
+  if (!keepThreshold) setIsoControls(DEFAULT_ISO);
 }
 
 function startMesh(request: MeshRequest, transfer: Transferable[], frame: { rowDir: Vec3; colDir: Vec3 }) {
@@ -492,17 +506,31 @@ function startMesh(request: MeshRequest, transfer: Transferable[], frame: { rowD
   worker.postMessage(request, transfer);
 }
 
-async function buildSeries(selected: SeriesInfo) {
+const CONE_BEAM_NOTE = 'Density values in this scan are not on the usual CT scale, which is common on cone-beam scanners. The starting threshold was chosen from the scan itself, so adjust it if bone looks incomplete.';
+
+/** Can be fewer than the series lists, when unreadable slices were left out. */
+let builtSlices = 0;
+
+async function buildSeries(selected: SeriesInfo, keepThreshold = false) {
   if (!current) return;
   current.selected = selected;
-  resetForNewModel();
+  resetForNewModel(keepThreshold);
+  const usableCount = current.series.filter((s) => s.usable).length;
+  $('seri-bilgi').textContent = usableCount < 2 ? [describeSeries(selected, current.series), selected.description].filter(Boolean).join(' · ') : selected.description;
   show('loading');
   setStep(1, `0 / ${num(selected.slices.length)}`, 30);
   try {
-    const { volume, step } = await assembleVolume(selected, current.sources, (done, total) => {
+    const { volume, step, failedSlices } = await assembleVolume(selected, current.sources, (done, total) => {
       setStep(1, `${num(done)} / ${num(total)}`, 30 + (done / total) * 55);
     });
-    const warnings = [...selected.warnings];
+    builtSlices = volume.nz;
+    const profile = profileDensity(volume);
+    const start = startingThreshold(profile, selected.filter);
+    setPresets(start, profile);
+    if (!keepThreshold) setIsoControls(start);
+    const warnings = [...current.uploadWarnings, ...selected.warnings];
+    if (failedSlices) warnings.push(`${failedSlices} ${failedSlices === 1 ? 'slice' : 'slices'} could not be read and ${failedSlices === 1 ? 'was' : 'were'} left out.`);
+    if (profile.offsetScale) warnings.push(CONE_BEAM_NOTE);
     if (step > 1) warnings.push('This scan is very large, so it was reduced to half resolution to fit in memory.');
     const dicomSpecies = selected.slices[0].species;
     if (current.details && speciesConflict(current.details.species, dicomSpecies)) warnings.push(`The file lists the species as "${dicomSpecies}", which differs from what you entered.`);
@@ -530,31 +558,32 @@ async function openCase(details: CaseDetails, files: File[], acceptedAt: string)
   show('loading');
   setStep(0, '', 2);
   try {
-    const sources = await toSources(files);
-    const { series, dicomFiles } = await scanSeries(sources, (done, total) => {
+    const { sources, problems } = await toSources(files);
+    const { series, dicomFiles, kinds } = await scanSeries(sources, (done, total) => {
       setStep(0, `${num(done)} / ${num(total)}`, (done / total) * 30);
     });
     if (!dicomFiles) {
-      showError('No DICOM found', 'No DICOM images in these files', 'Export the CT as DICOM from your scanner or PACS, then choose that folder or ZIP.');
+      showError('No DICOM found', 'No DICOM images in these files', explainNoDicom(kinds, problems));
       return;
     }
     const best = pickBestSeries(series);
     if (!best) {
-      const reason = series.find((s) => s.reason)?.reason ?? 'None of these series can be used.';
+      const reason = mainReason(series);
       const m = /This series is (\w+), not CT/.exec(reason);
       if (m) showError('Series not supported', `This scan is ${/^[AEIOUMNR]/.test(m[1]) ? 'an' : 'a'} ${m[1]}, not a CT`, 'Bone surfaces are built from CT density values. Export a CT series and try again.');
       else showError('Series not supported', 'This series cannot be used', reason);
       return;
     }
-    current = { details, acceptedAt, sources, series, selected: best, sample: false };
+    const uploadWarnings = ingestWarnings(problems);
+    const mixed = mixedUploadWarning(series);
+    if (mixed) uploadWarnings.unshift(mixed);
+    current = { details, acceptedAt, sources, series, selected: best, sample: false, uploadWarnings };
     const select = $<HTMLSelectElement>('seri');
     select.replaceChildren();
-    series.forEach((s, i) => {
-      const o = new Option(describeSeries(s), String(i), false, s === best);
-      o.disabled = !s.usable;
-      select.add(o);
-    });
-    select.disabled = series.length < 2;
+    // Scouts and dose reports never appear. The default comes first, then the rest by size.
+    const choices = series.filter((s) => s.usable).sort((a, b) => Number(b === best) - Number(a === best) || b.slices.length - a.slices.length);
+    for (const s of choices) select.add(new Option(describeSeries(s, series), String(series.indexOf(s)), false, s === best));
+    select.hidden = choices.length < 2;
     $('depo').hidden = false;
     renderStore({ kind: 'off', message: 'Waiting for the model.' });
     await buildSeries(best);
@@ -565,21 +594,56 @@ async function openCase(details: CaseDetails, files: File[], acceptedAt: string)
 
 $<HTMLSelectElement>('seri').addEventListener('change', (e) => {
   const s = current?.series[+(e.target as HTMLSelectElement).value];
-  if (s) void buildSeries(s);
+  if (s) void buildSeries(s, true);
 });
 
+function showExampleChrome(badge: string, line: string, seriesLine: string) {
+  $<HTMLSelectElement>('seri').hidden = true;
+  $('seri-bilgi').textContent = seriesLine;
+  $('depo').hidden = true;
+  $('vaka-rozet').textContent = badge;
+  $('vaka-rozet').hidden = false;
+  $('vaka-satir').textContent = line;
+  $('vaka-satir').title = '';
+}
+
+/** Opens a stored demo case: real anatomy with no patient details, no form and nothing sent anywhere. */
+async function openDemo(file: string, label: string) {
+  const mine = { details: null, acceptedAt: '', sources: [], series: [], selected: null, sample: true, uploadWarnings: [] };
+  current = mine;
+  resetForNewModel();
+  show('loading');
+  setStep(0, 'Downloading', 2);
+  try {
+    const { header, volume } = await fetchDemo(`demo/${file}.vseg`, (share) => setStep(0, `${Math.round(share * 100)}%`, share * 70));
+    if (current !== mine) return;
+    exampleInfo = { slices: header.nz, cols: header.nx, rows: header.ny, spacing: header.spacingMm.toFixed(1) };
+    const profile = profileDensity(volume);
+    const start = startingThreshold(profile, header.filter);
+    setPresets(start, profile);
+    setIsoControls(start);
+    showExampleChrome('Demo', `${label} · Real CT · Patient details removed`, `Demo case · ${header.species}`);
+    if (profile.offsetScale) {
+      const p = document.createElement('p');
+      p.className = 'uyari';
+      p.textContent = CONE_BEAM_NOTE;
+      $('uyarilar').append(p);
+    }
+    setStep(2, undefined, 85);
+    startMesh({ type: 'load', volume }, [volume.data.buffer as ArrayBuffer], { rowDir: volume.rowDir, colDir: volume.colDir });
+  } catch (err) {
+    showError('Something went wrong', 'This demo case could not be opened', err instanceof Error ? err.message : String(err));
+  }
+}
+
 async function openSample() {
-  current = { details: null, acceptedAt: '', sources: [], series: [], selected: null, sample: true };
+  current = { details: null, acceptedAt: '', sources: [], series: [], selected: null, sample: true, uploadWarnings: [] };
   resetForNewModel();
   show('loading');
   setStep(2, 'Generating', 70);
-  const select = $<HTMLSelectElement>('seri');
-  select.replaceChildren(new Option('Generated sample · 0.6 mm', '0'));
-  select.disabled = true;
-  $('depo').hidden = true;
-  $('vaka-rozet').hidden = false;
-  $('vaka-satir').textContent = 'Generated vertebrae · Not a real patient';
-  $('vaka-satir').title = '';
+  exampleInfo = SAMPLE_INFO;
+  setPresets(DEFAULT_ISO, { tissuePeak: 0, offsetScale: false });
+  showExampleChrome('Sample', 'Generated vertebrae · Not a real patient', 'Generated sample · 0.6 mm');
   startMesh({ type: 'sample' }, [], { rowDir: [1, 0, 0], colDir: [0, -1, 0] });
 }
 

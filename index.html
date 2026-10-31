@@ -100,7 +100,13 @@
           <p class="alan-hata" hidden></p>
         </div>
         <button class="btn btn-birincil tam" type="submit" id="basla">Build 3D model</button>
-        <button class="link-dugme" type="button" id="ornek">Try a generated sample instead</button>
+        <p class="ornekler">Or open an example:
+          <button class="link-dugme" type="button" id="ornek">Generated</button>
+          <button class="link-dugme" type="button" data-demo="cat1">Cat 1</button>
+          <button class="link-dugme" type="button" data-demo="cat2">Cat 2</button>
+          <button class="link-dugme" type="button" data-demo="dog1">Dog 1</button>
+          <button class="link-dugme" type="button" data-demo="dog2">Dog 2</button>
+        </p>
       </section>
     </div>
 
@@ -121,7 +127,8 @@
 
     <section class="bolme">
       <p class="etiket">Series</p>
-      <select class="secim" id="seri" aria-label="CT series"></select>
+      <select class="secim" id="seri" aria-label="CT series" hidden></select>
+      <p class="seri-bilgi" id="seri-bilgi"></p>
       <div id="uyarilar" style="display: grid; gap: 8px;"></div>
     </section>
 

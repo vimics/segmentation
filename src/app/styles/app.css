@@ -112,6 +112,10 @@ input[type="checkbox"]:checked::before { background: var(--vurgu-anlamli); }
 .sil { padding: 0; width: 20px; height: 20px; background: none; border: 0; color: var(--metin-ikincil); cursor: pointer; font: 400 15px/1 var(--mono); }
 .sil:hover { color: var(--baslik); }
 
+.ornekler { font-size: 13.5px; color: var(--metin-ikincil); text-align: center; line-height: 1.8; }
+.ornekler .link-dugme { display: inline; margin: 0 0 0 var(--b1); }
+.seri-bilgi { font-size: 13.5px; line-height: 1.45; color: var(--metin-ikincil); overflow-wrap: anywhere; }
+.seri-bilgi:empty { display: none; }
 .uyari { border-left: 3px solid var(--vurgu); padding-left: var(--b3); font-size: 13.5px; line-height: 1.45; color: var(--metin-birincil); }
 
 /* Viewport */

@@ -18,7 +18,7 @@ export class SurfaceEngine {
   private aoLevel!: Level;
   private lastPreviewTriangles = new Map<number, number>();
 
-  constructor(volume: Volume) {
+  constructor(volume: Volume, private budget = TRIANGLE_BUDGET) {
     sealVolumeEdges(volume);
     let level = levelFromVolume(volume);
     this.levels.push(level);
@@ -65,7 +65,10 @@ export class SurfaceEngine {
     const known = this.lastPreviewTriangles.get(iso)
       ?? extractSurface(this.levels[this.previewIndex], iso, this.aoLevel).indices.length / 3;
     let index = 0;
-    while (index < this.previewIndex && known * 4 ** (this.previewIndex - index) > TRIANGLE_BUDGET) index++;
-    return this.run(index, iso, 'full');
+    while (index < this.previewIndex && known * 4 ** (this.previewIndex - index) > this.budget) index++;
+    let result = this.run(index, iso, 'full');
+    // Noise grows faster than the estimate, because the coarser level smooths it away.
+    while (result.triangles > this.budget && index < this.previewIndex) result = this.run(++index, iso, 'full');
+    return result;
   }
 }
