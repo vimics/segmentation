@@ -1,6 +1,7 @@
 import type { FilterFamily, Volume } from '../types';
 
-const BIN = 50, LOW = -300, HIGH = 2000;
+/** Starts above -200, the value demo files flatten air to, so flattened air never counts as tissue. */
+const BIN = 50, LOW = -150, HIGH = 2000;
 const SAMPLE_VOXELS = 2_000_000;
 
 export const STANDARD_THRESHOLD = 250;

@@ -295,7 +295,7 @@ test.describe('file formats in real workers, under the production security polic
 });
 
 test.describe('demo cases', () => {
-  for (const [name, species] of [['Cat 1', 'Cat'], ['Cat 2', 'Cat'], ['Dog 1', 'Dog'], ['Dog 2', 'Dog']]) {
+  for (const [name, species, threshold] of [['Cat 1', 'Cat', '500'], ['Cat 2', 'Cat', '2000'], ['Dog 1', 'Dog', '500'], ['Dog 2', 'Dog', '500']]) {
     test(`${name} opens with no form, and nothing is sent`, async ({ page }) => {
       const problems = collectProblems(page);
       const outgoing: string[] = [];
@@ -305,6 +305,7 @@ test.describe('demo cases', () => {
       await page.locator('#yapilar li').first().waitFor({ timeout: 85_000 });
       await expect(page.locator('#vaka')).toContainText('Patient details removed');
       await expect(page.locator('#seri-bilgi')).toHaveText(`Demo case · ${species}`);
+      await expect(page.locator('#esik-sayi')).toHaveValue(threshold);
       await expect(page.locator('#depo')).toBeHidden();
       expect(outgoing).toEqual([]);
       expect(problems).toEqual([]);

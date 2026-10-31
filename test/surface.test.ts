@@ -210,6 +210,12 @@ describe('starting threshold', () => {
     expect(thresholdPresets(2000, p)).toEqual([2000, 2400, 2800]);
   });
 
+  it('still finds the offset scale when air has been flattened, as in the demo files', () => {
+    const p = profileDensity(scan([[-200, 8000], [1100, 1600], [50, 100], [2400, 200]]));
+    expect(p.tissuePeak).toBe(1100);
+    expect(p.offsetScale).toBe(true);
+  });
+
   it('is not fooled by a crop that is mostly bone on a calibrated scanner', () => {
     const p = profileDensity(scan([[-1000, 4000], [900, 3000], [40, 2500]]));
     expect(p.tissuePeak).toBe(900);
