@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What the Vimics Bone Viewer stores</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/src/app/styles/app.css">
+<style>
+  html, body { height: auto; }
+  body { display: block; overflow: auto; }
+  main { max-width: 760px; margin-inline: auto; padding: 48px 24px 96px; display: grid; gap: 16px; font-size: 16px; line-height: 1.65; }
+  h1 { font-size: clamp(28px, 3.4vw, 36px); line-height: 1.15; font-weight: 600; color: var(--baslik); }
+  h2 { margin-top: 16px; font-size: 20px; font-weight: 600; color: var(--alt-baslik); }
+  ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
+  li::marker { color: var(--vurgu-anlamli); }
+  a { color: var(--baglanti); }
+</style>
+</head>
+<body>
+<main>
+  <p class="etiket">Vimics Bone Viewer</p>
+  <h1>What is stored, and why</h1>
+  <p>The 3D model is built in your browser. Separately, when you agree on the start page, Vimics stores a de-identified copy of the scan to develop bone segmentation and labelling software.</p>
+
+  <h2>What Vimics stores</h2>
+  <ul>
+    <li>The CT images, with their geometry and scanner settings</li>
+    <li>The details you enter: patient name, cat or dog, breed, age, weight and clinician name</li>
+    <li>The study date, the threshold in use, the app version, and the time you agreed</li>
+  </ul>
+
+  <h2>What is removed before anything leaves your computer</h2>
+  <p>Your browser keeps only an approved list of technical DICOM fields. Everything else is dropped, including:</p>
+  <ul>
+    <li>Owner and responsible person names</li>
+    <li>The patient name and ID recorded in the file</li>
+    <li>Clinic name and address, and referring or performing clinician names</li>
+    <li>Free-text notes and descriptions, private vendor fields and nested data</li>
+    <li>Original study and series identifiers, which are replaced with random ones</li>
+  </ul>
+  <p>Series marked as having text burned into the images are not stored at all. The original files you selected are never sent.</p>
+
+  <h2>Where it goes</h2>
+  <p>Data is stored in Vimics' Microsoft SharePoint storage, for the development work described above.</p>
+
+  <h2>Your choices</h2>
+  <p>The viewer shows a case reference once a scan is stored. To have a case deleted, send that reference to <a href="mailto:info@vimics.vet">info@vimics.vet</a>. Data already used to train a model cannot be removed from that trained model.</p>
+  <p>Please agree only if you are entitled to share the scan, including where your clinic has obligations to the animal's owner.</p>
+
+  <h2>Contact</h2>
+  <p>Vimics, Mustafa Kemal Mah. Dumlupınar Bul. No:280/G İç Kapı No:1260, 06510 Çankaya / Ankara, Türkiye. <a href="mailto:info@vimics.vet">info@vimics.vet</a></p>
+</main>
+</body>
+</html>

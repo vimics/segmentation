@@ -1,0 +1,17 @@
+name = "vimics-bone-viewer-upload"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+[vars]
+# The sites allowed to send cases, comma separated. Update when the viewer moves to vimics.vet.
+ALLOWED_ORIGINS = "https://umuttutal.github.io,https://vimics.vet"
+ROOT_FOLDER = "BoneViewer"
+MAX_CASES_PER_HOUR = "30"
+
+# Set these as secrets, never in this file:
+#   npx wrangler secret put TENANT_ID
+#   npx wrangler secret put CLIENT_ID
+#   npx wrangler secret put CLIENT_SECRET
+#   npx wrangler secret put DRIVE_ID
+#   npx wrangler secret put ACCESS_CODE        (while testing)
+#   npx wrangler secret put TURNSTILE_SECRET   (before public launch)

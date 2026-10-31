@@ -1,0 +1,71 @@
+import type { SurfaceResult, Volume } from '../types';
+import { splitStructures } from './components';
+import { downsample, levelFromVolume, sealVolumeEdges, type Level } from './level';
+import { extractSurface } from './marching';
+
+/** Above this the mesh would strain integrated graphics, so a coarser level is used and stated. */
+export const TRIANGLE_BUDGET = 6_000_000;
+const PREVIEW_MAX_VOXELS = 24_000_000;
+const AO_MAX_VOXELS = 6_000_000;
+
+const voxels = (l: Level) => l.nx * l.ny * l.nz;
+
+export class SurfaceEngine {
+  /** Finest first */
+  private levels: Level[] = [];
+  private previewIndex = 0;
+  private lengthMm = 0;
+  private aoLevel!: Level;
+  private lastPreviewTriangles = new Map<number, number>();
+
+  constructor(volume: Volume) {
+    sealVolumeEdges(volume);
+    let level = levelFromVolume(volume);
+    this.levels.push(level);
+    while (voxels(level) > AO_MAX_VOXELS && Math.min(level.nx, level.ny) > 32) {
+      level = downsample(level);
+      this.levels.push(level);
+    }
+    this.aoLevel = level;
+    this.previewIndex = Math.max(0, this.levels.findIndex((l) => voxels(l) <= PREVIEW_MAX_VOXELS));
+    // A scan's own first level is usually fine for a tiny scan, but still halve it once if we can.
+    if (this.previewIndex === 0 && voxels(this.levels[0]) > 2_000_000) {
+      if (this.levels.length < 2) { this.levels.push(downsample(this.levels[0])); this.aoLevel = this.levels[1]; }
+      this.previewIndex = 1;
+    }
+    const f = this.levels[0];
+    this.lengthMm = Math.max((f.nx - 1) * f.dx, (f.ny - 1) * f.dy, (f.nz - 1) * f.dz);
+  }
+
+  private run(levelIndex: number, iso: number, quality: 'preview' | 'full'): SurfaceResult {
+    const level = this.levels[levelIndex];
+    const mesh = extractSurface(level, iso, this.aoLevel);
+    const triangles = mesh.indices.length / 3;
+    const { structures, specksRemoved } = splitStructures(mesh, { lengthMm: this.lengthMm });
+    if (quality === 'preview') {
+      if (this.lastPreviewTriangles.size > 64) this.lastPreviewTriangles.clear();
+      this.lastPreviewTriangles.set(iso, triangles);
+    }
+    return {
+      structures,
+      triangles: structures.reduce((n, s) => n + s.indices.length / 3, 0),
+      specksRemoved,
+      resolutionMm: level.dx,
+      iso,
+      quality,
+    };
+  }
+
+  preview(iso: number): SurfaceResult {
+    return this.run(this.previewIndex, iso, 'preview');
+  }
+
+  full(iso: number): SurfaceResult {
+    // Each halving step multiplies triangles by about four, so the preview predicts the cost.
+    const known = this.lastPreviewTriangles.get(iso)
+      ?? extractSurface(this.levels[this.previewIndex], iso, this.aoLevel).indices.length / 3;
+    let index = 0;
+    while (index < this.previewIndex && known * 4 ** (this.previewIndex - index) > TRIANGLE_BUDGET) index++;
+    return this.run(index, iso, 'full');
+  }
+}
