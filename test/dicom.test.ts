@@ -67,6 +67,13 @@ describe('decoding phantom slices', () => {
     }
   });
 
+  it('caps every scan to the shared range, whatever its own fill values are', async () => {
+    const values = [-2000, -1024, 226, 4000, 5000];
+    const spec = small({ rows: 1, cols: 5, intercept: -3000, hu: (i) => values[i] });
+    const { ds, h } = parse(writeSlice(spec));
+    expect(Array.from(await decodeHounsfield(ds, h))).toEqual([-1024, -1024, 226, 4000, 4000]);
+  });
+
   it('reads files that have no preamble', async () => {
     const spec = small({ syntax: 'implicit', noPreamble: true });
     const { ds, h } = parse(writeSlice(spec));

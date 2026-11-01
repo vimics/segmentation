@@ -1,3 +1,5 @@
+import type { HuRange } from './hu';
+
 export type Vec3 = [number, number, number];
 
 /** Everything the viewer needs from one DICOM file, without its pixels. */
@@ -106,6 +108,6 @@ export interface SurfaceResult {
   triangles: number;
   specksRemoved: number;
   resolutionMm: number;
-  iso: number;
+  range: HuRange;
   quality: 'preview' | 'full';
 }

@@ -75,12 +75,12 @@ for (const label of CASES) {
       shot.warnings = await page.locator('#uyarilar p').allTextContents();
       shot.structures = await page.locator('#yapilar li').allTextContents();
       await page.locator('.sahne').screenshot({ path: join(OUT, `${label}-default.png`) });
-      // SWEEP=cat2:1500,1800;cat1:400 also builds and captures those thresholds.
+      // SWEEP=cat2:1500,1800;cat1:400 also builds and captures those lower limits.
       const sweep = (process.env.SWEEP ?? '').split(';').find((e) => e.startsWith(`${label}:`))?.split(':')[1].split(',') ?? [];
       const results: Record<string, unknown> = {};
       for (const hu of sweep) {
-        await page.fill('#esik-sayi', hu);
-        await page.locator('#esik-sayi').blur();
+        await page.fill('#esik-sayi-min', hu);
+        await page.locator('#esik-sayi-min').blur();
         await page.waitForTimeout(2500);
         await page.locator('#iyilestir').waitFor({ state: 'hidden', timeout: 300_000 });
         await page.waitForTimeout(800);

@@ -1,11 +1,12 @@
 import { buildSampleVolume } from '../sample/bone';
+import type { HuRange } from '../hu';
 import { SurfaceEngine } from '../surface/pipeline';
 import type { SurfaceResult, Volume } from '../types';
 
 export type MeshRequest =
   | { type: 'load'; volume: Volume }
   | { type: 'sample' }
-  | { type: 'extract'; seq: number; iso: number; quality: 'preview' | 'full' };
+  | { type: 'extract'; seq: number; range: HuRange; quality: 'preview' | 'full' };
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 let engine: SurfaceEngine | null = null;
@@ -20,7 +21,7 @@ function pump() {
   if (!job || !engine) return;
   try {
     const started = performance.now();
-    const result = job.quality === 'preview' ? engine.preview(job.iso) : engine.full(job.iso);
+    const result = job.quality === 'preview' ? engine.preview(job.range) : engine.full(job.range);
     postResult(job.seq, result, performance.now() - started);
   } catch (err) {
     scope.postMessage({ type: 'error', seq: job.seq, message: err instanceof Error ? err.message : String(err) });

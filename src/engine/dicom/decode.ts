@@ -1,5 +1,6 @@
 import type { DataSet, Element } from 'dicom-parser';
 import * as dicomParser from 'dicom-parser';
+import { HU_MAX, HU_MIN } from '../hu';
 import type { SliceHeader } from '../types';
 import { decodeJ2K, decodeJpegLossless, decodeJpegLs } from './codecs';
 import { TS } from './header';
@@ -84,7 +85,7 @@ export async function decodeStoredPixels(ds: DataSet, h: SliceHeader): Promise<I
   }
 }
 
-/** Decoded slice in Hounsfield units, optionally thinned by an in-plane step. */
+/** Decoded slice in Hounsfield units, capped to the shared range and optionally thinned by an in-plane step. */
 export async function decodeHounsfield(ds: DataSet, h: SliceHeader, step = 1): Promise<Int16Array> {
   const stored = await decodeStoredPixels(ds, h);
   const m = h.rescaleSlope, b = h.rescaleIntercept;
@@ -94,7 +95,7 @@ export async function decodeHounsfield(ds: DataSet, h: SliceHeader, step = 1): P
     const row = j * step * h.cols;
     for (let i = 0; i < nx; i++, n++) {
       const v = Math.round(stored[row + i * step] * m + b);
-      out[n] = v > 32767 ? 32767 : v < -32768 ? -32768 : v;
+      out[n] = v > HU_MAX ? HU_MAX : v < HU_MIN ? HU_MIN : v;
     }
   }
   return out;

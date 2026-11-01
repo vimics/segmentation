@@ -135,14 +135,18 @@
     <section class="bolme">
       <div class="bolme-bas">
         <p class="etiket">Threshold</p>
-        <label class="deger"><input id="esik-sayi" type="number" min="-200" max="3000" step="10" value="250" aria-label="Threshold in Hounsfield units"><span>HU</span></label>
+        <div class="deger">
+          <input id="esik-sayi-min" type="number" min="-1024" max="4000" step="1" value="226" aria-label="Lowest density, in Hounsfield units">
+          <span class="ayrac">–</span>
+          <input id="esik-sayi-max" type="number" min="-1024" max="4000" step="1" value="1988" aria-label="Highest density, in Hounsfield units">
+          <span>HU</span>
+        </div>
       </div>
-      <input id="esik" type="range" min="-200" max="3000" step="10" value="250" aria-label="Threshold">
-      <div class="dilim" id="hazir" role="group" aria-label="Threshold presets">
-        <button type="button" data-hu="250">Bone<small>250</small></button>
-        <button type="button" data-hu="700">Cortical<small>700</small></button>
-        <button type="button" data-hu="1100">Dense<small>1100</small></button>
+      <div class="aralik" id="aralik">
+        <input id="esik-min" type="range" min="-1024" max="4000" step="1" value="226" aria-label="Lowest density">
+        <input id="esik-max" type="range" min="-1024" max="4000" step="1" value="1988" aria-label="Highest density">
       </div>
+      <p class="esik-not" id="esik-not">We normally expect cortical and cancellous bones between 226 - 1988 Hounsfield units, but shifts can occur due to the calibration, tube voltage and reconstruction filters. Use threshold slider to adjust for shifts and eliminate noise.</p>
     </section>
 
     <section class="bolme">

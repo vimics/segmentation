@@ -155,6 +155,8 @@ export interface SliceSpec {
   temporal?: string;
   contrast?: string;
   samples?: number;
+  /** Rescale intercept, for writing values far below zero */
+  intercept?: number;
   /** Size of a private block before the pixel data, to push them far into the file */
   privateBytes?: number;
 }
@@ -164,7 +166,7 @@ export function writeSlice(s: SliceSpec): Uint8Array {
   const uid = s.encoded?.uid ?? SYNTAX_UID[syntax];
   const le = syntax !== 'bigendian';
   const explicit = syntax !== 'implicit';
-  const intercept = -1024;
+  const intercept = s.intercept ?? -1024;
 
   const stored = new Uint16Array(s.rows * s.cols);
   for (let j = 0, n = 0; j < s.rows; j++) for (let i = 0; i < s.cols; i++, n++) {

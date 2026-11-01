@@ -1,3 +1,4 @@
+import type { HuRange } from '../engine/hu';
 import type { Source } from '../engine/io/sources';
 import type { SeriesInfo } from '../engine/types';
 import type { PackageReply } from '../engine/workers/package.worker';
@@ -68,7 +69,7 @@ export interface StoreRequest {
   consentText: string;
   series: SeriesInfo;
   sources: Source[];
-  thresholdHu: number;
+  threshold: HuRange;
 }
 
 /** Stores one series at a time, in the background, reporting plain status to the sidebar. */
@@ -123,7 +124,7 @@ export class CaseStore {
           dicomSpecies: first.species.slice(0, 200),
           dicomBreed: first.breed.slice(0, 200),
         },
-        viewer: { thresholdHu: req.thresholdHu },
+        viewer: { thresholdMinHu: req.threshold.min, thresholdMaxHu: req.threshold.max },
         files,
         zipBytes: zip.size,
       };

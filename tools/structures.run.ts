@@ -9,6 +9,7 @@ import { decodeHounsfield } from '../src/engine/dicom/decode';
 import { parseDataset, readHeader } from '../src/engine/dicom/header';
 import { scanSource } from '../src/engine/dicom/scan';
 import { groupSeries, pickBestSeries } from '../src/engine/dicom/series';
+import { HU_MAX } from '../src/engine/hu';
 import { readSource, toSources } from '../src/engine/io/sources';
 import { SurfaceEngine } from '../src/engine/surface/pipeline';
 import type { StructureMesh, Volume } from '../src/engine/types';
@@ -48,7 +49,7 @@ it('lists structures', async () => {
     const volume: Volume = { nx, ny, nz, data, positions, rowDir: series.rowDir, colDir: series.colDir, dx: series.pixelSpacing![1], dy: series.pixelSpacing![0] };
     const engine = new SurfaceEngine(volume);
     for (const iso of list.split(',').map(Number)) {
-      const r = engine.full(iso);
+      const r = engine.full({ min: iso, max: HU_MAX });
       const shown = r.structures.filter((s) => !s.autoHidden);
       console.log(`${label} [${series.filter} ${series.kernel}${series.reformat ? ' reformat' : ''} ${series.pixelSpacing![0].toFixed(2)}mm] @${iso}: ${shown.length} shown, ${r.structures.length} total, ${r.triangles} triangles, ${r.specksRemoved} specks, shown bone ${(shown.reduce((n, s) => n + s.volumeMm3, 0) / 1000).toFixed(1)} cm3`);
       if (process.env.COMPARE) continue;

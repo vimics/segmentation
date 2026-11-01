@@ -2,9 +2,9 @@ import { describeSeries, mainReason, mixedUploadWarning, pickBestSeries } from '
 import { toSources, type Source } from '../engine/io/sources';
 import { assembleVolume, scanSeries } from '../engine/load';
 import { fetchDemo } from '../engine/demo';
+import { BONE_RANGE, HU_MAX, HU_MIN, type HuRange } from '../engine/hu';
 import { SAMPLE_INFO } from '../engine/sample/bone';
 import type { SeriesInfo, StructureMesh, SurfaceResult, Vec3 } from '../engine/types';
-import { profileDensity, startingThreshold, thresholdPresets, type DensityProfile } from '../engine/surface/density';
 import { Viewer, type MeasureKind, type Measurement } from '../engine/viewer/viewer';
 import type { MeshRequest } from '../engine/workers/mesh.worker';
 import { CaseStore, type StoreRequest, type StoreState } from './caseStore';
@@ -13,7 +13,6 @@ import { explainNoDicom, filesFromDrop, ingestWarnings } from './ingest';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const num = (n: number) => n.toLocaleString('en-GB');
-const DEFAULT_ISO = 250;
 const LOGO = document.querySelector('.logo-link svg')?.outerHTML ?? '';
 
 // ---- Start page -------------------------------------------------------------------------------
@@ -138,7 +137,7 @@ function setStep(active: number, counter?: string, overall?: number) {
 let viewer: Viewer | null = null;
 let meshWorker: Worker | null = null;
 let current: { details: CaseDetails | null; acceptedAt: string; sources: Source[]; series: SeriesInfo[]; selected: SeriesInfo | null; sample: boolean; uploadWarnings: string[] } | null = null;
-let iso = DEFAULT_ISO;
+let threshold: HuRange = { ...BONE_RANGE };
 let seq = 0;
 let latestSurface: Omit<SurfaceResult, 'structures'> & { structures: StructureMesh[] } | null = null;
 let visibility: boolean[] = [];
@@ -288,39 +287,46 @@ function syncSlider(el: HTMLInputElement) {
 }
 
 function requestSurface(quality: 'preview' | 'full') {
-  const msg: MeshRequest = { type: 'extract', seq: ++seq, iso, quality };
+  const msg: MeshRequest = { type: 'extract', seq: ++seq, range: threshold, quality };
   meshWorker?.postMessage(msg);
 }
 
-function setPresets(start: number, profile: DensityProfile) {
-  const values = thresholdPresets(start, profile);
-  document.querySelectorAll<HTMLButtonElement>('#hazir button').forEach((b, i) => {
-    b.dataset.hu = String(values[i]);
-    b.querySelector('small')!.textContent = String(values[i]);
-  });
+/** Puts both ends on every control. The caller decides which end gives way if they would cross. */
+function setThreshold(min: number, max: number) {
+  threshold = { min: Math.round(min), max: Math.round(max) };
+  $<HTMLInputElement>('esik-min').value = String(threshold.min);
+  $<HTMLInputElement>('esik-max').value = String(threshold.max);
+  $<HTMLInputElement>('esik-sayi-min').value = String(threshold.min);
+  $<HTMLInputElement>('esik-sayi-max').value = String(threshold.max);
+  const share = (v: number) => `${((v - HU_MIN) / (HU_MAX - HU_MIN)) * 100}%`;
+  $('aralik').style.setProperty('--alt', share(threshold.min));
+  $('aralik').style.setProperty('--ust', share(threshold.max));
 }
-
-function setIsoControls(value: number) {
-  iso = Math.max(-200, Math.min(3000, Math.round(value)));
-  const range = $<HTMLInputElement>('esik'), box = $<HTMLInputElement>('esik-sayi');
-  range.value = String(iso);
-  box.value = String(iso);
-  syncSlider(range);
-  document.querySelectorAll<HTMLButtonElement>('#hazir button').forEach((b) => b.setAttribute('aria-pressed', String(+(b.dataset.hu ?? 0) === iso)));
-}
+const clampHu = (v: number) => Math.max(HU_MIN, Math.min(HU_MAX, Math.round(v) || 0));
+/** Dragging stops at the other end. Typing moves it along, since a typed value is what the vet asked for. */
+const dragMin = (v: number) => setThreshold(Math.min(clampHu(v), threshold.max - 1), threshold.max);
+const dragMax = (v: number) => setThreshold(threshold.min, Math.max(clampHu(v), threshold.min + 1));
+const typeMin = (v: number) => { const min = Math.min(clampHu(v), HU_MAX - 1); setThreshold(min, Math.max(threshold.max, min + 1)); };
+const typeMax = (v: number) => { const max = Math.max(clampHu(v), HU_MIN + 1); setThreshold(Math.min(threshold.min, max - 1), max); };
 
 /** Show the fast preview straight away, then refine once it has arrived. */
 let fullAfterPreview = false;
-const onIsoSettled = () => { fullAfterPreview = true; $('iyilestir').hidden = false; requestSurface('preview'); };
-$('esik').addEventListener('input', (e) => {
-  fullAfterPreview = false;
-  $('iyilestir').hidden = true;
-  setIsoControls(+(e.target as HTMLInputElement).value);
-  requestSurface('preview');
-});
-$('esik').addEventListener('change', onIsoSettled);
-$('esik-sayi').addEventListener('change', (e) => { setIsoControls(+(e.target as HTMLInputElement).value); onIsoSettled(); });
-document.querySelectorAll<HTMLButtonElement>('#hazir button').forEach((b) => b.addEventListener('click', () => { setIsoControls(+(b.dataset.hu ?? DEFAULT_ISO)); onIsoSettled(); }));
+const onThresholdSettled = () => { fullAfterPreview = true; $('iyilestir').hidden = false; requestSurface('preview'); };
+for (const [id, other, drag] of [['esik-min', 'esik-max', dragMin], ['esik-max', 'esik-min', dragMax]] as const) {
+  const slider = $<HTMLInputElement>(id);
+  slider.addEventListener('input', () => {
+    // The end last moved stays on top, so two thumbs at one spot can still be pulled apart.
+    slider.classList.add('ustte');
+    $(other).classList.remove('ustte');
+    fullAfterPreview = false;
+    $('iyilestir').hidden = true;
+    drag(+slider.value);
+    requestSurface('preview');
+  });
+  slider.addEventListener('change', onThresholdSettled);
+}
+$('esik-sayi-min').addEventListener('change', (e) => { typeMin(+(e.target as HTMLInputElement).value); onThresholdSettled(); });
+$('esik-sayi-max').addEventListener('change', (e) => { typeMax(+(e.target as HTMLInputElement).value); onThresholdSettled(); });
 
 document.querySelectorAll<HTMLInputElement>('#kesitler input[type=checkbox]').forEach((c) => c.addEventListener('change', () => {
   const axis = +(c.dataset.eksen ?? 0);
@@ -443,7 +449,7 @@ function storeCurrent() {
     consentText: $('onay-metin').textContent?.replace(/\s*What is stored\s*$/, '').trim() ?? '',
     series: current.selected,
     sources: current.sources,
-    thresholdHu: iso,
+    threshold,
   };
   store.store(lastStoreRequest);
 }
@@ -464,7 +470,7 @@ function resetForNewModel(keepThreshold = false) {
   $('uyarilar').replaceChildren();
   viewer?.setTool(null);
   viewer?.clearMeasurements();
-  if (!keepThreshold) setIsoControls(DEFAULT_ISO);
+  if (!keepThreshold) setThreshold(BONE_RANGE.min, BONE_RANGE.max);
 }
 
 function startMesh(request: MeshRequest, transfer: Transferable[], frame: { rowDir: Vec3; colDir: Vec3 }) {
@@ -506,8 +512,6 @@ function startMesh(request: MeshRequest, transfer: Transferable[], frame: { rowD
   worker.postMessage(request, transfer);
 }
 
-const CONE_BEAM_NOTE = 'Density values in this scan are not on the usual CT scale, which is common on cone-beam scanners. The starting threshold was chosen from the scan itself, so adjust it if bone looks incomplete.';
-
 /** Can be fewer than the series lists, when unreadable slices were left out. */
 let builtSlices = 0;
 
@@ -524,13 +528,8 @@ async function buildSeries(selected: SeriesInfo, keepThreshold = false) {
       setStep(1, `${num(done)} / ${num(total)}`, 30 + (done / total) * 55);
     });
     builtSlices = volume.nz;
-    const profile = profileDensity(volume);
-    const start = startingThreshold(profile, selected.filter);
-    setPresets(start, profile);
-    if (!keepThreshold) setIsoControls(start);
     const warnings = [...current.uploadWarnings, ...selected.warnings];
     if (failedSlices) warnings.push(`${failedSlices} ${failedSlices === 1 ? 'slice' : 'slices'} could not be read and ${failedSlices === 1 ? 'was' : 'were'} left out.`);
-    if (profile.offsetScale) warnings.push(CONE_BEAM_NOTE);
     if (step > 1) warnings.push('This scan is very large, so it was reduced to half resolution to fit in memory.');
     const dicomSpecies = selected.slices[0].species;
     if (current.details && speciesConflict(current.details.species, dicomSpecies)) warnings.push(`The file lists the species as "${dicomSpecies}", which differs from what you entered.`);
@@ -618,17 +617,7 @@ async function openDemo(file: string, label: string) {
     const { header, volume } = await fetchDemo(`demo/${file}.vseg`, (share) => setStep(0, `${Math.round(share * 100)}%`, share * 70));
     if (current !== mine) return;
     exampleInfo = { slices: header.nz, cols: header.nx, rows: header.ny, spacing: header.spacingMm.toFixed(1) };
-    const profile = profileDensity(volume);
-    const start = startingThreshold(profile, header.filter);
-    setPresets(start, profile);
-    setIsoControls(start);
     showExampleChrome('Demo', `${label} · Real CT · Patient details removed`, `Demo case · ${header.species}`);
-    if (profile.offsetScale) {
-      const p = document.createElement('p');
-      p.className = 'uyari';
-      p.textContent = CONE_BEAM_NOTE;
-      $('uyarilar').append(p);
-    }
     setStep(2, undefined, 85);
     startMesh({ type: 'load', volume }, [volume.data.buffer as ArrayBuffer], { rowDir: volume.rowDir, colDir: volume.colDir });
   } catch (err) {
@@ -642,7 +631,6 @@ async function openSample() {
   show('loading');
   setStep(2, 'Generating', 70);
   exampleInfo = SAMPLE_INFO;
-  setPresets(DEFAULT_ISO, { tissuePeak: 0, offsetScale: false });
   showExampleChrome('Sample', 'Generated vertebrae · Not a real patient', 'Generated sample · 0.6 mm');
   startMesh({ type: 'sample' }, [], { rowDir: [1, 0, 0], colDir: [0, -1, 0] });
 }
@@ -663,7 +651,7 @@ $('yeni-vaka').addEventListener('click', backToStart);
 $('yeniden').addEventListener('click', backToStart);
 
 show('start');
-setIsoControls(DEFAULT_ISO);
+setThreshold(BONE_RANGE.min, BONE_RANGE.max);
 
 if (!document.createElement('canvas').getContext('webgl2')) {
   showError('Graphics not available', 'This browser cannot show 3D graphics', 'Use a current version of Chrome, Edge, Safari or Firefox with hardware acceleration turned on.');

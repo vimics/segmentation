@@ -1,4 +1,5 @@
 import { edgeTable, triTable } from 'three/addons/objects/MarchingCubes.js';
+import type { HuRange } from '../hu';
 import type { MeshData } from '../types';
 import type { Level } from './level';
 
@@ -31,15 +32,17 @@ class GrowIndex {
 const AO_STEPS: Array<[number, number]> = [[2, 0.3], [4, 0.26], [7, 0.2], [11, 0.14], [16, 0.1]];
 
 /**
- * Marching cubes on the CT grid. Bone is the side at or above `iso`.
+ * Marching cubes on the CT grid. Bone is what lies inside the density range, limits included, so a
+ * surface forms at the lower limit against thinner tissue and at the upper limit against denser material.
  *
  * Vertices are placed using each slice's own recorded position, so uneven spacing and gantry
  * tilt come out right in millimetres without resampling the scan. Normals come from the CT
  * gradient, which shades smoothly without moving any geometry. Vertex colours hold an
  * occlusion term sampled from `aoLevel`, which gives crevices depth without post-processing.
  */
-export function extractSurface(l: Level, iso: number, aoLevel: Level): MeshData {
+export function extractSurface(l: Level, range: HuRange, aoLevel: Level): MeshData {
   const { nx, ny, nz, data, rowMax } = l;
+  const lo = range.min, hi = range.max;
   const sxy = nx * ny;
   const pos = new Grow(1 << 18), grad = new Grow(1 << 18);
   const tris = new GrowIndex(1 << 18);
@@ -58,7 +61,10 @@ export function extractSurface(l: Level, iso: number, aoLevel: Level): MeshData 
 
   /** Adds a vertex between two grid points, returning its index. Position is in grid units for now. */
   const vertex = (ai: number, aj: number, ak: number, bi: number, bj: number, bk: number, va: number, vb: number): number => {
-    const t = (iso - va) / (vb - va);
+    // One end of the edge is outside the range, and its side says which limit the edge crosses.
+    const out = va < lo || va > hi ? va : vb;
+    const upper = out > hi;
+    const t = ((upper ? hi : lo) - va) / (vb - va);
     pos.reserve(3);
     grad.reserve(3);
     const p = pos.a, g = grad.a, n = pos.n;
@@ -69,9 +75,11 @@ export function extractSurface(l: Level, iso: number, aoLevel: Level): MeshData 
     const gax = value(ai + 1, aj, ak) - value(ai - 1, aj, ak), gbx = value(bi + 1, bj, bk) - value(bi - 1, bj, bk);
     const gay = value(ai, aj + 1, ak) - value(ai, aj - 1, ak), gby = value(bi, bj + 1, bk) - value(bi, bj - 1, bk);
     const gaz = value(ai, aj, ak + 1) - value(ai, aj, ak - 1), gbz = value(bi, bj, bk + 1) - value(bi, bj, bk - 1);
-    g[n] = gax + (gbx - gax) * t;
-    g[n + 1] = gay + (gby - gay) * t;
-    g[n + 2] = gaz + (gbz - gaz) * t;
+    // Bone gets denser going inward at the lower limit, and thinner going inward at the upper one.
+    const sign = upper ? -1 : 1;
+    g[n] = sign * (gax + (gbx - gax) * t);
+    g[n + 1] = sign * (gay + (gby - gay) * t);
+    g[n + 2] = sign * (gaz + (gbz - gaz) * t);
     pos.n += 3;
     grad.n += 3;
     return n / 3;
@@ -83,21 +91,21 @@ export function extractSurface(l: Level, iso: number, aoLevel: Level): MeshData 
     for (let j = 0; j < ny - 1; j++) {
       // A row with no bone in any of its four neighbouring lines can't produce triangles.
       const r = j + k * ny;
-      if (rowMax[r] < iso && rowMax[r + 1] < iso && rowMax[r + ny] < iso && rowMax[r + ny + 1] < iso) continue;
+      if (rowMax[r] < lo && rowMax[r + 1] < lo && rowMax[r + ny] < lo && rowMax[r + ny + 1] < lo) continue;
       const row = j * nx;
       for (let i = 0; i < nx - 1; i++) {
         const a = row + i, b = a + nx;
         const v0 = data[z0 + a], v1 = data[z0 + a + 1], v2 = data[z0 + b + 1], v3 = data[z0 + b];
         const v4 = data[z1 + a], v5 = data[z1 + a + 1], v6 = data[z1 + b + 1], v7 = data[z1 + b];
         let c = 0;
-        if (v0 < iso) c |= 1;
-        if (v1 < iso) c |= 2;
-        if (v2 < iso) c |= 4;
-        if (v3 < iso) c |= 8;
-        if (v4 < iso) c |= 16;
-        if (v5 < iso) c |= 32;
-        if (v6 < iso) c |= 64;
-        if (v7 < iso) c |= 128;
+        if (v0 < lo || v0 > hi) c |= 1;
+        if (v1 < lo || v1 > hi) c |= 2;
+        if (v2 < lo || v2 > hi) c |= 4;
+        if (v3 < lo || v3 > hi) c |= 8;
+        if (v4 < lo || v4 > hi) c |= 16;
+        if (v5 < lo || v5 > hi) c |= 32;
+        if (v6 < lo || v6 > hi) c |= 64;
+        if (v7 < lo || v7 > hi) c |= 128;
         if (c === 0 || c === 255) continue;
         const mask = edgeTable[c];
 
@@ -127,10 +135,10 @@ export function extractSurface(l: Level, iso: number, aoLevel: Level): MeshData 
     ye1.fill(-1);
   }
 
-  return finish(l, pos, grad, tris, iso, aoLevel);
+  return finish(l, pos, grad, tris, lo, aoLevel);
 }
 
-function finish(l: Level, pos: Grow, grad: Grow, tris: GrowIndex, iso: number, ao: Level): MeshData {
+function finish(l: Level, pos: Grow, grad: Grow, tris: GrowIndex, lo: number, ao: Level): MeshData {
   const count = pos.n / 3;
   const positions = new Float32Array(count * 3);
   const normals = new Float32Array(count * 3);
@@ -154,7 +162,7 @@ function finish(l: Level, pos: Grow, grad: Grow, tris: GrowIndex, iso: number, a
     positions[n3 + 1] = py + rd[1] * ox + cd[1] * oy;
     positions[n3 + 2] = pz + rd[2] * ox + cd[2] * oy;
 
-    // Bone is denser inside, so the outward normal points down the gradient.
+    // The stored gradient points into the bone, so the outward normal points against it.
     const gx = -g[n3] / dx, gy = -g[n3 + 1] / dy, gz = -g[n3 + 2] / dz;
     let nx = gx * rd[0] + gy * cd[0] + gz * sd[0];
     let ny = gx * rd[1] + gy * cd[1] + gz * sd[1];
@@ -173,7 +181,7 @@ function finish(l: Level, pos: Grow, grad: Grow, tris: GrowIndex, iso: number, a
       const si = Math.round(ai + (ax * mm) / ao.dx), sj = Math.round(aj + (ay * mm) / ao.dy), sk = Math.round(ak + (az * mm) / ao.dz);
       if (si < 0 || sj < 0 || sk < 0 || si >= ao.nx || sj >= ao.ny || sk >= ao.nz) continue;
       const d = ao.data[si + sj * aoSx + sk * aoSxy];
-      const soft = (d - iso + 150) / 300;
+      const soft = (d - lo + 150) / 300;
       occ += weight * (soft < 0 ? 0 : soft > 1 ? 1 : soft);
     }
     const shade = Math.max(0.3, 1 - 1.15 * occ);

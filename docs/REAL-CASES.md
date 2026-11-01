@@ -19,7 +19,7 @@ Four veterinary CT cases, run exactly as received on 2026-10-31. Labels only: th
 | A description or image type states the plane | "SAG" means *right* in Turkish on an axial series, and Siemens marks sagittal reformats `AXIAL` | The plane comes from the slice orientation |
 | A change of acquisition number means a new volume | One 289-slice volume carries 4 acquisition numbers | Split a series only when positions repeat |
 | The smaller series has lower resolution | Reformats often have smaller pixels (0.18 to 0.24 mm against 0.48 mm), interpolated from the same 0.6 mm data | Most files stays the default, and the smaller series stay selectable |
-| 250 HU is a good start everywhere | Sharp filters overshoot, and the cone-beam scan has soft tissue near 1,100 instead of 50 | The start depends on the filter and on the scan's own tissue peak |
+| One range fits every scan's bone | Sharp filters overshoot, and the cone-beam scan has soft tissue near 1,120 | Every scan opens at 226 to 1988 HU, and the vet moves both ends |
 | The table is one long shell | At higher thresholds it breaks up, and tubing looks similar | Shells under 0.5 mm mean thickness are auto-hidden, and stay in the list |
 
 ## Series chosen
@@ -42,13 +42,31 @@ The same threshold on the same anatomy, Cat 1:
 | 500 HU | Soft (31) | 784,012 | 55 | 54.8 cm³ |
 | 500 HU | Bone (42) | 1,139,340 | 1,547 | 55.3 cm³ |
 
-## Starting thresholds
+## Threshold selector
 
-| Scan | Start | Evidence |
+Every scan is capped to −1024 to 4000 HU when decoded, and opens at 226 to 1988 HU. Nothing is adjusted per scan: no presets, no normalization and no choice based on the filter. An earlier version did all three, tuned by judging renders, which cannot happen on a vet's computer.
+
+Both ends move. A surface forms at the lower limit against thinner tissue and at the upper limit against denser material.
+
+What the default gives on these cases:
+
+| Case | At 226 to 1988 HU | What the vet does |
 |---|---|---|
-| Sharp bone filter | 500 HU | 3 cases, cleaner than 250 with thin bone kept |
-| Any other filter | 250 HU | 1 case compared by numbers, not by eye. Not tested as a default on a full case |
-| Offset scale (cone-beam) | Tissue peak + 900 | **1 case only.** Treat this rule as provisional |
+| Dog 1 | Clean bones, table hidden | Nothing |
+| Dog 2 | Clean bones | Nothing, or raise the lower limit to clear specks |
+| Cat 1 | Bones plus thin shells over the body, from a sharp filter | Raise the lower limit to about 500 |
+| Cat 2 | Whole body and table, with bone hidden inside | Raise the upper limit first, then set the lower limit: 2000 to 4000 shows the skeleton |
+
+Measured densities, every voxel of the series each case opens with:
+
+| | Cat 1 | Cat 2 | Dog 1 | Dog 2 |
+|---|---|---|---|---|
+| Lowest in file | −2000 (fill) | −1024 | −1024 | −1024 |
+| Highest in file | 4000 | 3071 | 3071 | 3071 |
+| Air peak | −985 | −845 | −1005 | about −1015 |
+| Soft tissue peak | 50 | 1120 | 40 | 40 |
+
+Cat 2's scale is stretched as well as shifted: its air to tissue span is 1965, against about 1045 on the others. Its bone also reaches the 12-bit ceiling of 3071.
 
 ## Timing and memory
 
@@ -56,10 +74,10 @@ Measured on this Mac in a real browser with software graphics, from pressing Bui
 
 | Case | First model | Stored | Peak browser memory | ZIP sent |
 |---|---|---|---|---|
-| Cat 1 | 3.3 s | | | |
-| Cat 2 | 6.5 s | | | |
-| Dog 1 | 3.1 s | 23 s | 1.9 GB | 193 MB |
-| Dog 2 | 3.8 s | 31 s | 2.3 GB | 304 MB |
+| Cat 1 | 3.6 s | | | |
+| Cat 2 | 5.8 s | | | |
+| Dog 1 | 3.2 s | 23 s | 2.1 GB | 193 MB |
+| Dog 2 | 3.7 s | 30 s | 2.3 GB | 304 MB |
 
 ## De-identification on the real files
 

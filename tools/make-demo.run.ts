@@ -1,6 +1,6 @@
 /**
- * Builds the public demo cases from test-data/. Only voxels and geometry are written, cropped to the bones, with
- * densities below the slider's minimum flattened. Set STEP=dog1:2 to halve a case in plane if it comes out too big.
+ * Builds the public demo cases from test-data/. Only voxels and geometry are written, cropped to what the viewer
+ * shows at the default range, with values below -300 HU rounded to shrink the file. Set STEP=dog1:2 to halve a case in plane if it comes out too big.
  * Run: npx vitest run --config tools/vitest.config.ts tools/make-demo.run.ts --disable-console-intercept
  */
 import { mkdirSync, openAsBlob, readdirSync, statSync, writeFileSync } from 'node:fs';
@@ -13,7 +13,7 @@ import { scanSource } from '../src/engine/dicom/scan';
 import { groupSeries, pickBestSeries } from '../src/engine/dicom/series';
 import { packDemo, unpackDemo, type DemoHeader } from '../src/engine/demo';
 import { readSource, toSources } from '../src/engine/io/sources';
-import { profileDensity, startingThreshold } from '../src/engine/surface/density';
+import { BONE_RANGE } from '../src/engine/hu';
 import { SurfaceEngine } from '../src/engine/surface/pipeline';
 import type { Volume } from '../src/engine/types';
 
@@ -22,7 +22,7 @@ const OUT = resolve(import.meta.dirname, '..', 'public', 'demo');
 const walk = (d: string, o: string[] = []): string[] => { for (const n of readdirSync(d)) { const p = join(d, n); if (statSync(p).isDirectory()) walk(p, o); else o.push(p); } return o; };
 const dot = (a: number[], b: number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const cross = (a: number[], b: number[]) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-const MARGIN = 4, FLOOR = -200;
+const MARGIN = 4, AIR_BELOW = -300, AIR_STEP = 32;
 
 it('builds demo cases', async () => {
   mkdirSync(OUT, { recursive: true });
@@ -43,11 +43,10 @@ it('builds demo cases', async () => {
       positions.set(h.position!, k * 3);
     }
     const volume: Volume = { nx, ny, nz, data, positions, rowDir: best.rowDir, colDir: best.colDir, dx, dy };
-    const iso = startingThreshold(profileDensity(volume), best.filter);
 
     // Crops to what the viewer shows. The corners of an image, where burned-in text sits, go with it.
     const engine = new SurfaceEngine({ ...volume, data: data.slice() });
-    const shown = engine.full(iso).structures.filter((s) => !s.autoHidden);
+    const shown = engine.full(BONE_RANGE).structures.filter((s) => !s.autoHidden);
     const normal = cross(best.rowDir, best.colDir);
     const along = Array.from({ length: nz }, (_, k) => dot([positions[k * 3], positions[k * 3 + 1], positions[k * 3 + 2]], normal));
     const increasing = along[nz - 1] >= along[0];
@@ -72,8 +71,9 @@ it('builds demo cases', async () => {
     for (let k = 0; k < cz; k++) {
       for (let j = 0; j < cy; j++) {
         const from = (k + k0) * nx * ny + (j + j0) * nx + i0;
-        const row = data.subarray(from, from + cx);
-        for (let i = 0; i < cx; i++) cropped[k * cx * cy + j * cx + i] = row[i] < FLOOR ? FLOOR : row[i];
+        const to = k * cx * cy + j * cx;
+        // Noise in the air is most of the file size and carries nothing, so only those values are rounded.
+        for (let i = 0; i < cx; i++) { const v = data[from + i]; cropped[to + i] = v < AIR_BELOW ? Math.round(v / AIR_STEP) * AIR_STEP : v; }
       }
       for (let d = 0; d < 3; d++) newPositions.push(positions[(k + k0) * 3 + d] + best.rowDir[d] * dx * i0 + best.colDir[d] * dy * j0);
     }
@@ -85,7 +85,7 @@ it('builds demo cases', async () => {
     };
     // Burned-in text stays on the same pixels through a series. Anatomy moves from slice to slice.
     const persistence = new Uint16Array(cx * cy);
-    for (let k = 0; k < cz; k++) for (let n = 0; n < persistence.length; n++) if (cropped[k * cx * cy + n] >= 1500 + (iso > 1000 ? 1500 : 0)) persistence[n]++;
+    for (let k = 0; k < cz; k++) for (let n = 0; n < persistence.length; n++) if (cropped[k * cx * cy + n] >= 3000) persistence[n]++;
     const fixedPixels = persistence.reduce((sum, c) => sum + (c >= cz * 0.9 ? 1 : 0), 0);
 
     const packed = packDemo(header, cropped);
@@ -94,9 +94,9 @@ it('builds demo cases', async () => {
 
     // The file must keep what it promises to: the same bones, and only the expected fields.
     const back = unpackDemo(packed);
-    const check = new SurfaceEngine(back.volume).full(iso);
+    const check = new SurfaceEngine(back.volume).full(BONE_RANGE);
     const shownBack = check.structures.filter((s) => !s.autoHidden).reduce((n, s) => n + s.volumeMm3, 0);
     const shownOrig = shown.reduce((n, s) => n + s.volumeMm3, 0);
-    console.log(`${label}: ${best.cols}x${best.rows}x${nz} -> ${cx}x${cy}x${cz} step ${step} | ${(cx * cy * cz / 1e6).toFixed(0)}M voxels | file ${(gz.length / 1e6).toFixed(1)} MB | start ${iso} | bone kept ${(shownBack / shownOrig * 100).toFixed(1)}% | pixels bright on 90%+ of slices ${fixedPixels} | fields ${Object.keys(header).length}`);
+    console.log(`${label}: ${best.cols}x${best.rows}x${nz} -> ${cx}x${cy}x${cz} step ${step} | ${(cx * cy * cz / 1e6).toFixed(0)}M voxels | file ${(gz.length / 1e6).toFixed(1)} MB | bone kept ${(shownBack / shownOrig * 100).toFixed(1)}% | pixels bright on 90%+ of slices ${fixedPixels} | fields ${Object.keys(header).length}`);
   }
 });

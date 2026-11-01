@@ -57,7 +57,7 @@ Abuse controls on the public endpoint: origin allow-list, size cap, per-address 
 
 ## Clinical accuracy rules
 
-- The threshold starts at 500 HU for sharp bone filters and 250 HU for others. Scans off the usual scale, as on cone-beam scanners, start from their own tissue peak, with a notice. The slider is always available, and switching series keeps its value.
+- Every scan is capped to −1024 to 4000 HU and opens at 226 to 1988 HU. Both ends of the selector move, and switching series keeps them. There are no presets, no normalization and no per-scan adjustment. A note under the selector explains why values can shift.
 - The cube and clip controls use plain X, Y and Z axes, so the screen makes no left or right claim. Handedness has its own test.
 - Series with irregular spacing, missing slices or thick slices show a warning. Missing position data stops the load with a clear message.
 - Series flagged as having burned-in annotations are not uploaded.

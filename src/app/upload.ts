@@ -23,7 +23,7 @@ export interface CaseRecord {
     dicomSpecies: string;
     dicomBreed: string;
   };
-  viewer: { thresholdHu: number };
+  viewer: { thresholdMinHu: number; thresholdMaxHu: number };
   files: number;
   zipBytes: number;
 }

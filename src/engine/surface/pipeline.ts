@@ -1,3 +1,4 @@
+import type { HuRange } from '../hu';
 import type { SurfaceResult, Volume } from '../types';
 import { splitStructures } from './components';
 import { downsample, levelFromVolume, sealVolumeEdges, type Level } from './level';
@@ -16,7 +17,7 @@ export class SurfaceEngine {
   private previewIndex = 0;
   private lengthMm = 0;
   private aoLevel!: Level;
-  private lastPreviewTriangles = new Map<number, number>();
+  private lastPreviewTriangles = new Map<string, number>();
 
   constructor(volume: Volume, private budget = TRIANGLE_BUDGET) {
     sealVolumeEdges(volume);
@@ -37,38 +38,38 @@ export class SurfaceEngine {
     this.lengthMm = Math.max((f.nx - 1) * f.dx, (f.ny - 1) * f.dy, (f.nz - 1) * f.dz);
   }
 
-  private run(levelIndex: number, iso: number, quality: 'preview' | 'full'): SurfaceResult {
+  private run(levelIndex: number, range: HuRange, quality: 'preview' | 'full'): SurfaceResult {
     const level = this.levels[levelIndex];
-    const mesh = extractSurface(level, iso, this.aoLevel);
+    const mesh = extractSurface(level, range, this.aoLevel);
     const triangles = mesh.indices.length / 3;
     const { structures, specksRemoved } = splitStructures(mesh, { lengthMm: this.lengthMm });
     if (quality === 'preview') {
       if (this.lastPreviewTriangles.size > 64) this.lastPreviewTriangles.clear();
-      this.lastPreviewTriangles.set(iso, triangles);
+      this.lastPreviewTriangles.set(`${range.min}:${range.max}`, triangles);
     }
     return {
       structures,
       triangles: structures.reduce((n, s) => n + s.indices.length / 3, 0),
       specksRemoved,
       resolutionMm: level.dx,
-      iso,
+      range,
       quality,
     };
   }
 
-  preview(iso: number): SurfaceResult {
-    return this.run(this.previewIndex, iso, 'preview');
+  preview(range: HuRange): SurfaceResult {
+    return this.run(this.previewIndex, range, 'preview');
   }
 
-  full(iso: number): SurfaceResult {
+  full(range: HuRange): SurfaceResult {
     // Each halving step multiplies triangles by about four, so the preview predicts the cost.
-    const known = this.lastPreviewTriangles.get(iso)
-      ?? extractSurface(this.levels[this.previewIndex], iso, this.aoLevel).indices.length / 3;
+    const known = this.lastPreviewTriangles.get(`${range.min}:${range.max}`)
+      ?? extractSurface(this.levels[this.previewIndex], range, this.aoLevel).indices.length / 3;
     let index = 0;
     while (index < this.previewIndex && known * 4 ** (this.previewIndex - index) > this.budget) index++;
-    let result = this.run(index, iso, 'full');
+    let result = this.run(index, range, 'full');
     // Noise grows faster than the estimate, because the coarser level smooths it away.
-    while (result.triangles > this.budget && index < this.previewIndex) result = this.run(++index, iso, 'full');
+    while (result.triangles > this.budget && index < this.previewIndex) result = this.run(++index, range, 'full');
     return result;
   }
 }

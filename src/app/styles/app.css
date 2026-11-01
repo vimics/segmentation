@@ -74,6 +74,19 @@ select.secim { width: 100%; height: var(--kontrol); padding: 0 var(--b2); backgr
 .deger input { width: 68px; height: 32px; padding: 0 var(--b1); text-align: right; font: 500 20px/1 var(--mono); color: var(--baslik); background: transparent; border: 0; border-bottom: 1px solid var(--kenarlik); -moz-appearance: textfield; appearance: textfield; }
 .deger input::-webkit-outer-spin-button, .deger input::-webkit-inner-spin-button { -webkit-appearance: none; }
 .deger span { font: 400 12.5px/1 var(--mono); color: var(--metin-ikincil); }
+.deger input[id^="esik-sayi"] { width: 52px; padding: 0 2px; font-size: 15px; }
+.deger .ayrac { color: var(--metin-ikincil); }
+
+/* Two sliders share one track. Only their thumbs take the pointer, so either end can be dragged. */
+.aralik { --alt: 0%; --ust: 100%; position: relative; height: 24px; }
+.aralik::before { content: ''; position: absolute; left: 0; right: 0; top: 11px; height: 2px; background: linear-gradient(to right, var(--kenarlik) var(--alt), var(--vurgu) var(--alt), var(--vurgu) var(--ust), var(--kenarlik) var(--ust)); }
+.aralik input[type="range"] { position: absolute; inset: 0; pointer-events: none; background: none; }
+.aralik input[type="range"]::-webkit-slider-runnable-track { background: none; }
+.aralik input[type="range"]::-moz-range-track { background: none; }
+.aralik input[type="range"]::-webkit-slider-thumb { pointer-events: auto; }
+.aralik input[type="range"]::-moz-range-thumb { pointer-events: auto; }
+.aralik input[type="range"].ustte { z-index: 1; }
+.esik-not { font-size: 12.5px; line-height: 1.45; color: var(--metin-ikincil); }
 
 input[type="range"] { --dolu: 0%; -webkit-appearance: none; appearance: none; width: 100%; height: 24px; margin: 0; background: transparent; cursor: pointer; }
 input[type="range"]::-webkit-slider-runnable-track { height: 2px; background: linear-gradient(to right, var(--vurgu) var(--dolu), var(--kenarlik) var(--dolu)); }
@@ -85,10 +98,8 @@ input[type="range"]:disabled { opacity: 0.35; cursor: default; }
 .dilim { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); border: 1px solid var(--kenarlik); border-radius: var(--r2); overflow: hidden; }
 .dilim button { min-height: var(--kontrol); padding: var(--b1); display: grid; justify-items: center; gap: 0; background: var(--zemin); border: 0; border-left: 1px solid var(--kenarlik); font-size: 13px; font-weight: 500; line-height: 1.25; cursor: pointer; }
 .dilim button:first-child { border-left: 0; }
-.dilim button small { font: 400 11px/1.2 var(--mono); color: var(--metin-ikincil); }
 .dilim button:hover { background: var(--zemin-yukseltilmis); }
 .dilim button[aria-pressed="true"] { background: var(--eylem-zemin); color: var(--eylem-metin); }
-.dilim button[aria-pressed="true"] small { color: inherit; }
 
 .yapilar { list-style: none; margin: 0; padding: 0; }
 .yapilar li { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; gap: var(--b2); min-height: 32px; font-size: 14px; border-radius: var(--r2); cursor: pointer; }

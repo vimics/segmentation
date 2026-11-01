@@ -145,15 +145,17 @@ test.describe('viewer', () => {
 
     const tris = () => page.locator('#ozet').innerText();
     const before = await tris();
-    await page.click('#hazir [data-hu="700"]');
+    await page.fill('#esik-sayi-min', '700');
+    await page.press('#esik-sayi-min', 'Enter');
     await expect.poll(tris, { timeout: 30_000 }).not.toBe(before);
     await page.locator('#iyilestir[hidden]').waitFor({ state: 'attached', timeout: 30_000 });
 
-    await page.fill('#esik-sayi', '3000');
-    await page.press('#esik-sayi', 'Enter');
+    await page.fill('#esik-sayi-min', '3000');
+    await page.press('#esik-sayi-min', 'Enter');
+    await expect(page.locator('#esik-sayi-max')).toHaveValue('3001');
     await expect(page.locator('#ipucu')).toContainText('No surface at this threshold', { timeout: 30_000 });
-    await page.fill('#esik-sayi', '250');
-    await page.press('#esik-sayi', 'Enter');
+    await page.fill('#esik-sayi-min', '226');
+    await page.press('#esik-sayi-min', 'Enter');
     await expect(page.locator('#ipucu')).toBeHidden({ timeout: 30_000 });
     await page.locator('#iyilestir[hidden]').waitFor({ state: 'attached', timeout: 30_000 });
 
@@ -240,11 +242,14 @@ test.describe('file formats in real workers, under the production security polic
     const b = spherePhantom({ radiusMm: 6, size: 32, count: 32 }).slices.map((s) => ({ ...s, seriesUid: '1.2.3.2', instance: s.instance + 1000 }));
     await open(page, asFiles([...a, ...b]));
     await waitForModel(page);
-    await page.fill('#esik-sayi', '400');
-    await page.locator('#esik-sayi').blur();
+    await page.fill('#esik-sayi-min', '400');
+    await page.locator('#esik-sayi-min').blur();
+    await page.fill('#esik-sayi-max', '1500');
+    await page.locator('#esik-sayi-max').blur();
     await page.selectOption('#seri', { index: 1 });
     await expect(page.locator('#ozet')).toContainText('32 slices', { timeout: 60_000 });
-    await expect(page.locator('#esik-sayi')).toHaveValue('400');
+    await expect(page.locator('#esik-sayi-min')).toHaveValue('400');
+    await expect(page.locator('#esik-sayi-max')).toHaveValue('1500');
   });
 
   test('one usable series shows no choice, and scouts and dose reports are never listed', async ({ page }) => {
@@ -295,7 +300,7 @@ test.describe('file formats in real workers, under the production security polic
 });
 
 test.describe('demo cases', () => {
-  for (const [name, species, threshold] of [['Cat 1', 'Cat', '500'], ['Cat 2', 'Cat', '2000'], ['Dog 1', 'Dog', '500'], ['Dog 2', 'Dog', '500']]) {
+  for (const [name, species] of [['Cat 1', 'Cat'], ['Cat 2', 'Cat'], ['Dog 1', 'Dog'], ['Dog 2', 'Dog']]) {
     test(`${name} opens with no form, and nothing is sent`, async ({ page }) => {
       const problems = collectProblems(page);
       const outgoing: string[] = [];
@@ -305,12 +310,61 @@ test.describe('demo cases', () => {
       await page.locator('#yapilar li').first().waitFor({ timeout: 85_000 });
       await expect(page.locator('#vaka')).toContainText('Patient details removed');
       await expect(page.locator('#seri-bilgi')).toHaveText(`Demo case · ${species}`);
-      await expect(page.locator('#esik-sayi')).toHaveValue(threshold);
+      await expect(page.locator('#esik-sayi-min')).toHaveValue('226');
+      await expect(page.locator('#esik-sayi-max')).toHaveValue('1988');
       await expect(page.locator('#depo')).toBeHidden();
       expect(outgoing).toEqual([]);
       expect(problems).toEqual([]);
     });
   }
+});
+
+test.describe('threshold selector', () => {
+  const NOTE = 'We normally expect cortical and cancellous bones between 226 - 1988 Hounsfield units, but shifts can occur due to the calibration, tube voltage and reconstruction filters. Use threshold slider to adjust for shifts and eliminate noise.';
+
+  test('opens at 226 to 1988 with the note and no presets, and the ends cannot cross', async ({ page }) => {
+    await open(page, sphereFiles());
+    await waitForModel(page);
+    await expect(page.locator('#esik-min')).toHaveValue('226');
+    await expect(page.locator('#esik-max')).toHaveValue('1988');
+    await expect(page.locator('#esik-min')).toHaveAttribute('min', '-1024');
+    await expect(page.locator('#esik-max')).toHaveAttribute('max', '4000');
+    await expect(page.locator('#esik-not')).toHaveText(NOTE);
+    await expect(page.locator('#hazir')).toHaveCount(0);
+
+    // Dragging one thumb past the other stops it there.
+    await page.locator('#esik-min').evaluate((el: HTMLInputElement) => { el.value = '3500'; el.dispatchEvent(new Event('input', { bubbles: true })); });
+    await expect(page.locator('#esik-sayi-min')).toHaveValue('1987');
+    await expect(page.locator('#esik-sayi-max')).toHaveValue('1988');
+  });
+
+  test('both thumbs can be grabbed with the pointer', async ({ page }) => {
+    await open(page, sphereFiles());
+    await waitForModel(page);
+    const box = (await page.locator('#aralik').boundingBox())!;
+    const at = (hu: number) => box.x + ((hu + 1024) / 5024) * box.width;
+    const y = box.y + box.height / 2;
+    await page.mouse.move(at(1988), y);
+    await page.mouse.down();
+    await page.mouse.move(at(3000), y, { steps: 4 });
+    await page.mouse.up();
+    expect(+(await page.locator('#esik-sayi-max').inputValue())).toBeGreaterThan(2500);
+    await expect(page.locator('#esik-sayi-min')).toHaveValue('226');
+    await page.mouse.move(at(226), y);
+    await page.mouse.down();
+    await page.mouse.move(at(800), y, { steps: 4 });
+    await page.mouse.up();
+    expect(+(await page.locator('#esik-sayi-min').inputValue())).toBeGreaterThan(500);
+  });
+
+  test('lowering the top of the range changes the model', async ({ page }) => {
+    await open(page, sphereFiles());
+    await waitForModel(page);
+    const before = await page.locator('#ozet').innerText();
+    await page.fill('#esik-sayi-max', '600');
+    await page.press('#esik-sayi-max', 'Enter');
+    await expect.poll(() => page.locator('#ozet').innerText(), { timeout: 30_000 }).not.toBe(before);
+  });
 });
 
 test.describe('clear messages', () => {

@@ -78,7 +78,7 @@ export function validateCase(body: unknown, maxZip: number): Record<string, unkn
   if (!study || typeof study !== 'object') throw bad('study');
   if (!isNumber(study.slices, 1, 100_000) || !isNumber(study.rows, 1, 16_384) || !isNumber(study.cols, 1, 16_384)) throw bad('study size');
   for (const key of ['manufacturer', 'model', 'kernel', 'dicomSpecies', 'dicomBreed']) if (!isText(study[key], LIMITS.text)) throw bad(key);
-  if (!viewer || !isNumber(viewer.thresholdHu, -3000, 4000)) throw bad('viewer');
+  if (!viewer || !isNumber(viewer.thresholdMinHu, -1024, 4000) || !isNumber(viewer.thresholdMaxHu, -1024, 4000)) throw bad('viewer');
   if (!isNumber(c.files as unknown, 1, 100_000)) throw bad('files');
   if (!isNumber(c.zipBytes as unknown, 1, maxZip)) throw new HttpError(413, 'This scan is larger than the storage limit.');
   return c as unknown as Record<string, unknown>;

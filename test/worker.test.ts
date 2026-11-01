@@ -11,7 +11,7 @@ const validCase = () => ({
   patient: { name: 'Max', species: 'Dog', breed: null, ageMonths: 38, weightKg: 12.4 },
   clinician: null,
   study: { date: null, manufacturer: 'A', model: 'B', kernel: 'C', slices: 10, rows: 512, cols: 512, pixelSpacingMm: [0.5, 0.5], sliceSpacingMm: 0.6, dicomSpecies: '', dicomBreed: '' },
-  viewer: { thresholdHu: 250 },
+  viewer: { thresholdMinHu: 226, thresholdMaxHu: 1988 },
   files: 10,
   zipBytes: 1000,
 });
