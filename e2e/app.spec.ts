@@ -107,7 +107,7 @@ test.describe('viewer', () => {
 
     await expect(page.locator('#vaka-satir')).toHaveText('Max · Dog · Beagle · 3 y 2 mo · 12.4 kg · Jane Doe, DVM · 12 Oct 2026');
     await expect(page.locator('#yapilar li')).toHaveCount(1);
-    await expect(page.locator('.yakinda')).toContainText('A neural network bone segmentation engine is in training at Vimics HQ, will be available at vimics.vet/segmentation, at no charge.');
+    await expect(page.locator('.yakinda')).toContainText('A neural network bone segmentation engine is in training at Vimics HQ, will be available at no charge, on vimics.vet/segmentation.');
     await expect(page.locator('.urun-ad')).toHaveText('V-Seg Engine v1.0');
     await expect(page.locator('.ray .etiket:visible')).toHaveText(['Coming soon', 'Threshold', 'Filters', 'Measure', 'Section Analysis', 'Case storage', 'Structures']);
     await expect(page.locator('.ray > *').first()).toHaveClass('yakinda');

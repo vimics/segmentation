@@ -27,7 +27,7 @@ Viewer header order: `Patient Name · Cat or Dog · Breed · Age · Weight kg ·
 ## Interface wording
 
 - Top strip: "V-Seg Engine v1.0"
-- Sidebar, above all controls: "A neural network bone segmentation engine is in training at Vimics HQ, will be available at vimics.vet/segmentation, at no charge."
+- Sidebar, above all controls: "A neural network bone segmentation engine is in training at Vimics HQ, will be available at no charge, on vimics.vet/segmentation."
 - Footer: "Not suitable for surgical planning or 3D printing, which require human inspection with validated medical software. © 2026 Vimics"
 
 ## Pipeline
