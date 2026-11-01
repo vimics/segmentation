@@ -537,7 +537,17 @@ test.describe('rotating the view', () => {
   /** The cube's rotation, which follows the camera: the 16 numbers of its CSS matrix. */
   const cube = (page: Page) => page.locator('#kup').evaluate((el) => (el as HTMLElement).style.transform.match(/-?[\d.e-]+/g)!.slice(1).map(Number));
   const near = (a: number[], b: number[]) => a.every((v, i) => Math.abs(v - b[i]) < 1e-3);
-  const settle = (page: Page) => page.waitForTimeout(650);
+  /** Waits until the cube has stopped moving, since slow graphics can stretch an animation well past its 420 ms. */
+  const settle = async (page: Page) => {
+    await page.waitForTimeout(500);
+    let last = '';
+    await expect.poll(async () => {
+      const now = await page.locator('#kup').evaluate((el) => (el as HTMLElement).style.transform);
+      const still = now === last;
+      last = now;
+      return still;
+    }, { timeout: 20_000, intervals: [250] }).toBe(true);
+  };
   const sample = async (page: Page) => { await page.goto('/'); await page.click('#ornek'); await waitForModel(page); await settle(page); };
   const center = async (page: Page) => { const b = (await page.locator('#tuval').boundingBox())!; return { x: b.x + b.width / 2, y: b.y + b.height / 2, b }; };
   const drag = async (page: Page, dx: number, dy: number, button: 'left' | 'right' = 'left') => {
@@ -621,12 +631,8 @@ test.describe('rotating the view', () => {
 
   test('panning follows the pointer exactly, and zoom still works', async ({ page }) => {
     await sample(page);
-    await page.click('[data-arac="distance"]');
     const { x, y } = await center(page);
-    await page.mouse.click(x, y);
-    await page.keyboard.press('Escape');
     const dot = page.locator('#katman circle').first();
-    await expect(dot).toHaveCount(1);
     const at = async () => [+(await dot.getAttribute('cx'))!, +(await dot.getAttribute('cy'))!];
 
     // A second point finishes the measurement, so its dots stay on screen.
@@ -634,11 +640,13 @@ test.describe('rotating the view', () => {
     await page.mouse.click(x, y);
     await page.mouse.click(x + 30, y + 10);
     await page.keyboard.press('Escape');
+    await expect(dot).toHaveCount(1);
     const first = await at();
     await drag(page, 100, -60, 'right');
-    const moved = await at();
-    expect(Math.abs(moved[0] - first[0] - 100)).toBeLessThan(3);
-    expect(Math.abs(moved[1] - first[1] + 60)).toBeLessThan(3);
+    await expect.poll(async () => {
+      const moved = await at();
+      return Math.max(Math.abs(moved[0] - first[0] - 100), Math.abs(moved[1] - first[1] + 60));
+    }, { timeout: 10_000 }).toBeLessThan(3);
 
     const scale = () => page.locator('#olcek-yazi').textContent();
     const barWidth = () => page.locator('#olcek-cizgi').evaluate((el) => (el as HTMLElement).getBoundingClientRect().width);
