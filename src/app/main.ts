@@ -454,7 +454,7 @@ $('goruntu').addEventListener('click', async () => {
   if (!viewer) return;
   const dark = document.documentElement.dataset.theme === 'dark';
   const logo = LOGO.replaceAll('var(--logo-monogram)', dark ? '#FFFFFF' : '#26497F').replaceAll('var(--logo-kelime)', '#4CB088');
-  const blob = await viewer.snapshot(dark ? '#244870' : '#F7F8FA', dark ? '#C9D2DD' : '#5A6675', logo, $('vaka-satir').textContent ?? '');
+  const blob = await viewer.snapshot(dark ? '#244870' : '#F7F8FA', dark ? '#C9D2DD' : '#5A6675', logo, $('vaka-satir').textContent ?? '', dark);
   const a = document.createElement('a');
   a.download = 'vimics-v-seg.png';
   a.href = URL.createObjectURL(blob);

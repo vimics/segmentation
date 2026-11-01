@@ -566,7 +566,7 @@ export class Viewer {
   }
 
   /** The model, a scale bar and the Vimics mark. Never any patient or owner details. */
-  async snapshot(background: string, ink: string, logoMarkup: string, caption: string): Promise<Blob> {
+  async snapshot(background: string, ink: string, logoMarkup: string, caption: string, dark = false): Promise<Blob> {
     this.render();
     const canvas = this.el.canvas, w = canvas.width, h = canvas.height, ratio = this.renderer.getPixelRatio();
     const out = document.createElement('canvas');
@@ -577,13 +577,46 @@ export class Viewer {
     ctx.fillRect(0, 0, w, h);
     ctx.drawImage(canvas, 0, 0);
 
+    /** Frosted ice behind the labels, so they stay readable over the model. Blurs by rescaling, since Safari lacks canvas filters. */
+    const frost = (px: number, py: number, pw: number, ph: number) => {
+      const shape = new Path2D();
+      shape.roundRect(px, py, pw, ph, 8 * ratio);
+      const shrink = 14 * ratio, blur = document.createElement('canvas');
+      blur.width = Math.max(1, Math.ceil(pw / shrink));
+      blur.height = Math.max(1, Math.ceil(ph / shrink));
+      blur.getContext('2d')?.drawImage(out, px, py, pw, ph, 0, 0, blur.width, blur.height);
+      ctx.save();
+      ctx.clip(shape);
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(blur, px, py, pw, ph);
+      const ice = ctx.createLinearGradient(px, py, px + pw, py + ph);
+      ice.addColorStop(0, dark ? 'rgba(44, 78, 112, 0.84)' : 'rgba(255, 255, 255, 0.88)');
+      ice.addColorStop(1, dark ? 'rgba(20, 42, 68, 0.74)' : 'rgba(222, 238, 247, 0.76)');
+      ctx.fillStyle = ice;
+      ctx.fillRect(px, py, pw, ph);
+      ctx.restore();
+      ctx.lineWidth = ratio;
+      ctx.strokeStyle = dark ? 'rgba(190, 225, 245, 0.38)' : 'rgba(150, 190, 214, 0.6)';
+      ctx.stroke(shape);
+    };
+
     const pxPerMm = this.pxPerMm() * ratio;
     const scale = this.niceScale(pxPerMm, 56 * ratio);
-    const x = 24 * ratio, y = h - 20 * ratio;
+    const x = 24 * ratio, y = h - 22 * ratio;
+    ctx.font = `${12 * ratio}px "IBM Plex Mono", monospace`;
+
+    // The case details sit beside the scale bar, shortened if the image is too narrow for them.
+    const captionX = x + scale * pxPerMm + 16 * ratio, room = w - captionX - 24 * ratio;
+    let text = caption;
+    while (text && ctx.measureText(text).width > room) text = text.slice(0, -2).trimEnd() + '…';
+    if (text.length < 2) text = '';
+    const labelEnd = Math.max(x + scale * pxPerMm, x + ctx.measureText(`${scale} mm`).width);
+    const panelEnd = text ? captionX + ctx.measureText(text).width : labelEnd;
+    frost(x - 12 * ratio, y - 29 * ratio, panelEnd - x + 24 * ratio, 39 * ratio);
+
     ctx.strokeStyle = ink;
     ctx.fillStyle = ink;
     ctx.lineWidth = ratio;
-    ctx.font = `${12 * ratio}px "IBM Plex Mono", monospace`;
     ctx.fillText(`${scale} mm`, x, y - 14 * ratio);
     ctx.beginPath();
     ctx.moveTo(x, y - 6 * ratio);
@@ -591,18 +624,15 @@ export class Viewer {
     ctx.lineTo(x + scale * pxPerMm, y);
     ctx.lineTo(x + scale * pxPerMm, y - 6 * ratio);
     ctx.stroke();
-
-    // The case details sit beside the scale bar, shortened if the image is too narrow for them.
-    const captionX = x + scale * pxPerMm + 16 * ratio, room = w - captionX - 24 * ratio;
-    let text = caption;
-    while (text && ctx.measureText(text).width > room) text = text.slice(0, -2).trimEnd() + '…';
-    if (text.length > 1) ctx.fillText(text, captionX, y);
+    if (text) ctx.fillText(text, captionX, y);
 
     const img = new Image();
     await new Promise((res) => { img.onload = res; img.onerror = res; img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(logoMarkup)}`; });
     if (img.width) {
-      const lh = 34 * ratio, lw = lh * (2000 / 362), lx = w - lw - 20 * ratio, ly = 16 * ratio;
+      const lh = 34 * ratio, lw = lh * (2000 / 362), lx = w - lw - 24 * ratio, ly = 22 * ratio;
+      frost(lx - 12 * ratio, ly - 10 * ratio, lw + 24 * ratio, lh + 36 * ratio);
       ctx.drawImage(img, lx, ly, lw, lh);
+      ctx.fillStyle = ink;
       ctx.textAlign = 'right';
       ctx.fillText('vimics.vet', lx + lw, ly + lh + 16 * ratio);
       ctx.textAlign = 'left';
