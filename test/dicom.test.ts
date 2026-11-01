@@ -5,7 +5,7 @@ import { decodeHounsfield, decodeStoredPixels } from '../src/engine/dicom/decode
 import { deidentify } from '../src/engine/dicom/deidentify';
 import { parseDataset, readHeader } from '../src/engine/dicom/header';
 import { scanSource } from '../src/engine/dicom/scan';
-import { describeSeries, filterFamily, groupSeries, mainReason, mixedUploadWarning, pickBestSeries } from '../src/engine/dicom/series';
+import { filterFamily, groupSeries, mainReason, mixedUploadWarning, pickBestSeries } from '../src/engine/dicom/series';
 import { HEAD_BYTES } from '../src/engine/io/sniff';
 import { PLANTED, spherePhantom, writeSlice, type SliceSpec, type Syntax } from './phantom';
 
@@ -213,39 +213,23 @@ describe('series assembly', () => {
     const named = (uid: string, count: number, extra: Partial<SliceSpec>, dz = 1) => stack(count, { seriesUid: uid, ...extra }, dz);
     const choose = (...groups: SliceSpec[][]) => pickBestSeries(groupSeries(headers(groups.flat())))!;
 
-    it('matches the TotalSegmentator study: the full scan beats a sharper partial one', () => {
-      const best = choose(named('br', 362, { kernel: 'Br44', description: '' }), named('bl', 136, { kernel: 'Bl64', description: '' }));
-      expect(best.kernel).toBe('Br44');
-      expect(best.slices.length).toBe(362);
+    it('takes the most slices, whatever the filter or kind of series', () => {
+      expect(choose(named('br', 362, { kernel: 'Br44', description: '' }), named('bl', 136, { kernel: 'Bl64', description: '' })).kernel).toBe('Br44');
+      expect(choose(named('s', 200, { kernel: 'B31s', description: '' }), named('b', 190, { kernel: 'B70f', description: '' })).kernel).toBe('B31s');
+      expect(choose(named('o', 766, { kernel: 'I80s', imageType: 'ORIGINAL\\PRIMARY\\AXIAL' }), named('m', 800, { kernel: 'I80s', imageType: 'DERIVED\\PRIMARY\\AXIAL\\CT_SOM5 MPR' })).slices.length).toBe(800);
     });
 
-    it('takes the bone filter when both cover the scan', () => {
-      expect(choose(named('s', 200, { kernel: 'B31s', description: '' }), named('b', 190, { kernel: 'B70f', description: '' })).kernel).toBe('B70f');
-    });
-
-    it('does not let a partial bone series hide the full scan', () => {
-      expect(choose(named('s', 300, { kernel: 'B31s', description: '' }), named('b', 100, { kernel: 'B70f', description: '' })).kernel).toBe('B31s');
-    });
-
-    it('prefers the reconstruction over a reformat with as much coverage', () => {
-      const best = choose(named('o', 766, { kernel: 'I80s', description: '', imageType: 'ORIGINAL\\PRIMARY\\AXIAL\\CT_SOM5 SPI' }), named('m', 800, { kernel: 'I80s', description: '', imageType: 'DERIVED\\PRIMARY\\AXIAL\\CT_SOM5 MPR' }));
-      expect(best.slices.length).toBe(766);
-      expect(best.reformat).toBe(false);
-    });
-
-    it('accepts a reformat when the upload has nothing else, as one real case did', () => {
-      const best = choose(named('m', 708, { kernel: 'B70f', description: '', imageType: 'DERIVED\\PRIMARY\\AXIAL\\CT_SOM5 MPR' }));
-      expect(best.slices.length).toBe(708);
-    });
-
-    it('does not count DERIVED alone as a reformat, because main series are often marked that way', () => {
-      const best = choose(named('m', 289, { kernel: '42', description: 'BILAT BONE', imageType: 'DERIVED\\SECONDARY\\\\POST_RECON' }), named('r', 51, { kernel: '42', description: 'BONE', imageType: 'DERIVED\\SECONDARY\\\\MPR' }));
-      expect(best.slices.length).toBe(289);
-      expect(best.reformat).toBe(false);
-    });
-
-    it('prefers pre-contrast when everything else is equal', () => {
+    it('settles a tie by reconstruction, then bone filter, then no contrast', () => {
+      const original = 'ORIGINAL\\PRIMARY\\AXIAL', reformat = 'DERIVED\\PRIMARY\\AXIAL\\CT_SOM5 MPR';
+      expect(choose(named('m', 50, { kernel: 'B70f', description: '', imageType: reformat }), named('o', 50, { kernel: 'B31s', description: '', imageType: original })).reformat).toBe(false);
+      expect(choose(named('s', 50, { kernel: 'B31s', description: '' }), named('b', 50, { kernel: 'B70f', description: '' })).kernel).toBe('B70f');
+      expect(choose(named('h', 50, { kernel: '31', description: 'BILAT' }), named('h2', 50, { kernel: '42', description: 'BILAT BONE' })).kernel).toBe('42');
       expect(choose(named('post', 50, { kernel: 'B70f', contrast: 'IOHEXOL' }), named('pre', 50, { kernel: 'B70f' })).slices[0].contrast).toBe(false);
+    });
+
+    it('takes the first one read when nothing separates them', () => {
+      expect(choose(named('a', 50, { kernel: 'X1', description: '' }), named('b', 50, { kernel: 'X2', description: '' })).kernel).toBe('X1');
+      expect(choose(named('b', 50, { kernel: 'X2', description: '' }), named('a', 50, { kernel: 'X1', description: '' })).kernel).toBe('X2');
     });
   });
 
@@ -264,20 +248,6 @@ describe('series assembly', () => {
     ['42', 'BILAT ON EKSTREMITE BONE', 'bone'], ['31', 'BILAT ON EKSTREMITE', 'unknown'], ['', '', 'unknown'],
   ])('filter %s with description "%s" is %s', (kernel, description, family) => {
     expect(filterFamily(kernel, description)).toBe(family);
-  });
-
-  it('names rows plainly and never guesses a filter', () => {
-    const all = groupSeries(headers([
-      ...stack(100, { seriesUid: 'b', kernel: 'Hr64', description: '' }),
-      ...stack(30, { seriesUid: 'l', kernel: 'Bl64', description: '' }),
-      ...stack(100, { seriesUid: 'u', kernel: '', description: '' }),
-      ...stack(20, { seriesUid: 'n', kernel: '31', description: '', imageType: 'DERIVED\\SECONDARY\\\\MPR', orientation: [0, 1, 0, 0, 0, -1] }).map((s, k) => ({ ...s, position: [k, 0, 0] })),
-    ]));
-    const row = (uid: string) => describeSeries(all.find((s) => s.slices[0].seriesUid === uid)!, all);
-    expect(row('b')).toBe('Bone filter (Hr64) · Full scan · 1.0 mm · 100 slices');
-    expect(row('l')).toBe('Lung filter (Bl64) · Partial scan · 1.0 mm · 30 slices');
-    expect(row('u')).toBe('CT series · Full scan · 1.0 mm · 100 slices');
-    expect(row('n')).toBe('Filter 31 · Sagittal reformat · 1.0 mm · 20 slices');
   });
 
   it('blames the main series, not a stray dose report, when nothing can be used', () => {

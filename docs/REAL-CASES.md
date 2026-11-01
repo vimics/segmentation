@@ -16,9 +16,9 @@ Four veterinary CT cases, run exactly as received on 2026-10-31. Labels only: th
 | Assumption | What the cases showed | Decision |
 |---|---|---|
 | `DERIVED` images are secondary | The main series is `DERIVED` in 3 of 4 cases | Only reformat markers such as `MPR` count against a series, and a reformat is accepted when nothing else exists |
-| A description or image type states the plane | "SAG" means *right* in Turkish on an axial series, and Siemens marks sagittal reformats `AXIAL` | The plane comes from the slice orientation |
+| A description or image type states the plane | "SAG" means *right* in Turkish on an axial series, and Siemens marks sagittal reformats `AXIAL` | Plane comes from the slice orientation |
 | A change of acquisition number means a new volume | One 289-slice volume carries 4 acquisition numbers | Split a series only when positions repeat |
-| The smaller series has lower resolution | Reformats often have smaller pixels (0.18 to 0.24 mm against 0.48 mm), interpolated from the same 0.6 mm data | Most files stays the default, and the smaller series stay selectable |
+| The smaller series has lower resolution | Reformats often have smaller pixels (0.18 to 0.24 mm against 0.48 mm), though their source isn't recorded | The most slices always opens, and there is no choice of series |
 | One range fits every scan's bone | Sharp filters overshoot, and the cone-beam scan has soft tissue near 1,120 | Every scan opens at 226 to 1988 HU, and the vet moves both ends |
 | The table is one long shell | At higher thresholds it breaks up, and tubing looks similar | Pieces under 0.5 mm mean thickness join the table under the Thin fragments filter |
 
@@ -28,8 +28,8 @@ Four veterinary CT cases, run exactly as received on 2026-10-31. Labels only: th
 |---|---|---|
 | Cat 1 | Filter 42, description ending BONE, 289 slices | Ties on slices, and the bone series wins |
 | Cat 2 | The only series | |
-| Dog 1 | I80s, 766 slices | Reconstruction beats the 732-slice reformats |
-| Dog 2 | B70f axial, 708 slices | Sagittal and coronal reformats cover far less |
+| Dog 1 | I80s, 766 slices | Most slices |
+| Dog 2 | B70f axial, 708 slices | Most slices |
 
 ## The filter changes the model
 

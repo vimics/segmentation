@@ -192,46 +192,16 @@ function analyse(id: string, input: SliceHeader[]): SeriesInfo {
   return info;
 }
 
-/** Share of the longest usable series a series must cover to count as the full scan. */
-const FULL_SCAN = 0.9;
-
-const longestCoverage = (series: SeriesInfo[]) => Math.max(0, ...series.filter((s) => s.usable && s.plane === 'axial').map((s) => s.coverageMm));
-
 /**
- * The series with the most files is normally the full scan. Among series covering the full scan, reconstructions
- * beat reformats and bone filters beat the rest, so a partial bone series never hides the rest of the scan.
+ * The series with the most slices opens, with no choice offered. A tie prefers a reconstruction over a reformat,
+ * then a bone filter, then no contrast, and after that whichever was read first.
  */
 export function pickBestSeries(series: SeriesInfo[]): SeriesInfo | null {
   const usable = series.filter((s) => s.usable);
   if (!usable.length) return null;
-  const longest = Math.max(...usable.map((s) => s.coverageMm));
-  const isFull = (s: SeriesInfo) => s.coverageMm >= longest * FULL_SCAN;
-  let pool = usable;
-  if (usable.some((s) => !s.reformat && isFull(s))) pool = pool.filter((s) => !s.reformat);
-  const bone = pool.filter((s) => s.filter === 'bone' && isFull(s));
-  if (bone.length) pool = bone;
-  const rank = (s: SeriesInfo) => s.slices.length - (s.slices[0].contrast ? 0.5 : 0);
-  return pool.reduce((best, s) => (rank(s) > rank(best) ? s : best));
-}
-
-const FILTER_NAMES: Record<Exclude<FilterFamily, 'unknown'>, string> = { bone: 'Bone filter', soft: 'Soft tissue filter', lung: 'Lung filter' };
-const capital = (s: string) => s[0].toUpperCase() + s.slice(1);
-
-function filterLabel(s: SeriesInfo): string {
-  const kernel = s.kernel.trim();
-  if (s.filter === 'unknown') return kernel ? `Filter ${kernel}` : 'CT series';
-  return kernel ? `${FILTER_NAMES[s.filter]} (${kernel})` : FILTER_NAMES[s.filter];
-}
-
-/** One row of the series list, for example "Bone filter (I80s) · Full scan · 0.6 mm · 766 slices". */
-export function describeSeries(s: SeriesInfo, all: SeriesInfo[]): string {
-  if (!s.usable) return `${filterLabel(s)} · not usable`;
-  const parts = [filterLabel(s)];
-  if (s.reformat) parts.push(`${capital(s.plane)} reformat`);
-  else if (s.plane !== 'axial') parts.push(capital(s.plane));
-  if (s.plane === 'axial') parts.push(s.coverageMm >= longestCoverage(all) * FULL_SCAN ? 'Full scan' : 'Partial scan');
-  parts.push(`${s.sliceSpacing.toFixed(1)} mm`, `${s.slices.length} slices`);
-  return parts.join(' · ');
+  const rank = (s: SeriesInfo) => [s.slices.length, s.reformat ? 0 : 1, s.filter === 'bone' ? 1 : 0, s.slices[0].contrast ? 0 : 1];
+  const beats = (a: number[], b: number[]) => { for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] > b[i]; return false; };
+  return usable.reduce((best, s) => (beats(rank(s), rank(best)) ? s : best));
 }
 
 /** Why nothing can be shown, taken from the largest group so a stray dose report isn't blamed. */

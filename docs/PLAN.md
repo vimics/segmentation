@@ -11,7 +11,7 @@ A free web tool: a vet enters patient details, drops a CT series, and gets a 3D 
 | Consent | Required checkbox on the start page. The viewer does not open without it. Legal review (KVKK, GDPR) is needed before public launch |
 | Stored data | De-identified in the browser using an allow-list of DICOM fields, plus the form details and consent record. Original files never leave the computer |
 | Processing | The 3D model is built in the browser. Upload runs in the background and never blocks the viewer |
-| Hosting | Public GitHub repo with GitHub Pages for testing, then `vimics.vet/viewer/` |
+| Hosting | Public GitHub repo with GitHub Pages, ending at `vimics.vet/segmentation/`. See `GO-LIVE.md` |
 | Upload service | Cloudflare Worker holds the SharePoint credentials and issues one-time upload links. Vets never sign in |
 | Output | No STL or mesh export. PNG snapshot with no patient details |
 | Engine | Online3DViewer is a design reference, not a dependency. three.js, on-demand rendering, plain DOM and TypeScript |
@@ -33,7 +33,7 @@ Viewer header order: `Patient Name · Cat or Dog · Breed · Age · Weight kg ·
 ## Pipeline
 
 1. **Ingest:** folder, loose files or ZIP, including nested and self-extracting ZIPs. Every file is named from its content. Programs, pictures and damaged archives are skipped, and only the first bytes of each are read. See `docs/REAL-CASES.md`.
-2. **Parse and group:** split by series, matrix, plane, pixel size, large gaps and repeated passes. One odd file never loses a series. The default is the bone-filter series with the most files if it covers at least 90% of the longest series, otherwise the series with the most files. Reconstructions beat reformats. Other usable series stay selectable under plain names, and scouts and dose reports are never listed.
+2. **Parse and group:** split by series, matrix, plane, pixel size, large gaps and repeated passes. One odd file never loses a series. The series with the most slices opens, with no choice offered. A tie prefers a reconstruction, then a bone filter, then no contrast, then the first read.
 3. **Decode:** uncompressed (implicit, explicit, big endian, deflated), RLE, JPEG Lossless, JPEG-LS and JPEG 2000. Rescale to Hounsfield units.
 4. **Build the volume:** sort slices along the slice normal. Vertices use each slice's own position, so uneven spacing and gantry tilt stay correct in true millimetres. No resampling.
 5. **Extract the surface:** marching cubes. Half-resolution preview first, then full. A triangle budget chooses the level, and the footer states the mesh resolution.
@@ -52,13 +52,13 @@ Viewer header order: `Patient Name · Cat or Dog · Breed · Age · Weight kg ·
 
 Demo cases open with no form and no storage. They hold only voxels and geometry, cropped to the bones.
 
-Storage layout: `BoneViewer/YYYY/MM/<caseId>/case.json` and `series.zip`.
+Storage layout: `V-Seg/YYYY/MM/<caseId>/case.json` and `series.zip`.
 
 Abuse controls on the public endpoint: origin allow-list, size cap, per-address rate limit, optional bot check and optional access code during testing. The Microsoft app is limited to one dedicated SharePoint site.
 
 ## Clinical accuracy rules
 
-- Every scan is capped to −1024 to 4000 HU and opens at 226 to 1988 HU. Both ends of the selector move, and switching series keeps them. There are no presets, no normalization and no per-scan adjustment. A note under the selector explains why values can shift.
+- Every scan is capped to −1024 to 4000 HU and opens at 226 to 1988 HU. Both ends of the selector move. There are no presets, no normalization and no per-scan adjustment. A note under the selector explains why values can shift.
 - The cube and Section Analysis controls use plain X, Y and Z axes, so the screen makes no left or right claim. Handedness has its own test.
 - Series with irregular spacing, missing slices or thick slices show a warning. Missing position data stops the load with a clear message.
 - Series flagged as having burned-in annotations are not uploaded.

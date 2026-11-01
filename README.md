@@ -30,6 +30,7 @@ Put real test scans in `test-data/`. That folder is ignored by git and must stay
 | `tools` | Local checks and demo builds that run against `test-data/` |
 | `public/demo` | Demo cases: voxels and geometry only, built by `tools/make-demo.run.ts` |
 | `docs/PLAN.md` | Product decisions |
+| `docs/GO-LIVE.md` | Putting it on vimics.vet and connecting SharePoint |
 | `docs/REAL-CASES.md` | What real cases taught us |
 | `docs/SETUP-UPLOAD.md` | Connecting SharePoint |
 

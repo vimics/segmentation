@@ -1,11 +1,11 @@
-name = "vimics-bone-viewer-upload"
+name = "vimics-v-seg-upload"
 main = "src/index.ts"
 compatibility_date = "2026-10-01"
 
 [vars]
-# The sites allowed to send cases, comma separated. Update when the viewer moves to vimics.vet.
+# The sites allowed to send cases, comma separated.
 ALLOWED_ORIGINS = "https://umuttutal.github.io,https://vimics.vet"
-ROOT_FOLDER = "BoneViewer"
+ROOT_FOLDER = "V-Seg"
 MAX_CASES_PER_HOUR = "30"
 
 # Set these as secrets, never in this file:

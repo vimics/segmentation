@@ -20,8 +20,8 @@ const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY ?? '';
 /** A link like ?code=abc grants upload access during testing, and is kept for this tab. */
 function accessCode(): string | undefined {
   const fromUrl = new URLSearchParams(location.search).get('code');
-  if (fromUrl) sessionStorage.setItem('bv-code', fromUrl);
-  return sessionStorage.getItem('bv-code') ?? undefined;
+  if (fromUrl) sessionStorage.setItem('vseg-code', fromUrl);
+  return sessionStorage.getItem('vseg-code') ?? undefined;
 }
 
 let turnstile: Promise<{ render: (el: HTMLElement, o: Record<string, unknown>) => void }> | null = null;

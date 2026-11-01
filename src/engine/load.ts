@@ -110,7 +110,13 @@ export async function scanSeries(sources: Source[], onProgress: (done: number, t
 /** Above this the tab risks running out of memory, so the scan is thinned with a visible notice. */
 export const MAX_VOXELS = 420_000_000;
 
-export interface LoadedVolume { volume: Volume; step: number; failedSlices: number; }
+export interface LoadedVolume {
+  volume: Volume;
+  step: number;
+  failedSlices: number;
+  /** The slices that could be read, which are also the ones worth storing */
+  readable: SliceHeader[];
+}
 
 /** A few unreadable slices become a warning. Beyond this share the model would mislead, so loading stops. */
 const MAX_FAILED_SHARE = 0.05;
@@ -162,5 +168,5 @@ export async function assembleVolume(series: SeriesInfo, sources: Source[], onPr
   kept.forEach((h, k) => positions.set(h.position as number[], k * 3));
 
   const spacing = pixelSpacing as [number, number];
-  return { volume: { nx, ny, nz: kept.length, data, positions, rowDir, colDir, dx: spacing[1] * step, dy: spacing[0] * step }, step, failedSlices: failed.size };
+  return { volume: { nx, ny, nz: kept.length, data, positions, rowDir, colDir, dx: spacing[1] * step, dy: spacing[0] * step }, step, failedSlices: failed.size, readable: kept };
 }

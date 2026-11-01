@@ -125,8 +125,6 @@ input[type="checkbox"]:checked::before { background: var(--vurgu-anlamli); }
 
 .ornekler { font-size: 13.5px; color: var(--metin-ikincil); text-align: center; line-height: 1.8; }
 .ornekler .link-dugme { display: inline; margin: 0 0 0 var(--b1); }
-.seri-bilgi { font-size: 13.5px; line-height: 1.45; color: var(--metin-ikincil); overflow-wrap: anywhere; }
-.seri-bilgi:empty { display: none; }
 .uyari { border-left: 3px solid var(--vurgu); padding-left: var(--b3); font-size: 13.5px; line-height: 1.45; color: var(--metin-birincil); }
 
 /* Viewport */
@@ -255,7 +253,10 @@ input[type="checkbox"]:checked::before { background: var(--vurgu-anlamli); }
   body { overflow: auto; min-height: 100dvh; grid-template-rows: auto minmax(auto, 1fr) auto; }
   .baslangic { overflow: visible; }
   .sutunlar { grid-template-columns: 1fr; }
-  .calisma { grid-template-columns: 1fr; grid-template-rows: 58vh auto; }
+  .calisma { grid-template-columns: minmax(0, 1fr); grid-template-rows: 58vh auto; }
+  .bolme-bas { flex-wrap: wrap; }
+  /* The scan summary stops short of the orientation cube. */
+  .sahne-sol { right: 110px; }
   .sahne { order: -1; }
   .ray { border-right: 0; overflow: visible; }
   .vaka, .ust-ayrac { display: none; }
@@ -264,5 +265,5 @@ input[type="checkbox"]:checked::before { background: var(--vurgu-anlamli); }
   .serit { grid-template-columns: 1fr; }
   .serit div + div { padding-left: 0; border-left: 0; border-top: 1px solid var(--ayrac); }
 }
-@media (max-width: 480px) { .urun-ad { display: none; } .ust .btn { padding-inline: var(--b3); font-size: 13px; } .baslangic-ic { padding-inline: var(--b4); } }
+@media (max-width: 480px) { .urun-ad { display: none; } .ust .btn { padding-inline: var(--b2); font-size: 12.5px; white-space: nowrap; } .ust .logo-link svg { max-width: 118px; height: auto; } .ust { gap: var(--b2); } .baslangic-ic { padding-inline: var(--b4); } }
 @media (prefers-reduced-motion: reduce) { .cubuk i { transition: none; } }

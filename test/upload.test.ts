@@ -12,7 +12,7 @@ function harness(handler: Handler) {
   const fetchFn = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     calls.push({ url, init });
-    if (url === `${SERVICE}/v1/cases`) return json({ caseId: 'BV-1', uploadUrl: SHAREPOINT });
+    if (url === `${SERVICE}/v1/cases`) return json({ caseId: 'VS-1', uploadUrl: SHAREPOINT });
     return handler(url, init);
   }) as typeof fetch;
   return { calls, config: { serviceUrl: SERVICE, fetchFn, sleep: async () => {} } };
@@ -27,7 +27,7 @@ describe('uploading a case', () => {
     const size = CHUNK_BYTES * 2 + 1000;
     const progress: number[] = [];
     const { caseId } = await uploadCase(config, record, zipOf(size), (sent) => progress.push(sent));
-    expect(caseId).toBe('BV-1');
+    expect(caseId).toBe('VS-1');
     expect(CHUNK_BYTES % (320 * 1024)).toBe(0);
     const ranges = puts(calls).map((c) => (c.init?.headers as Record<string, string>)['Content-Range']);
     expect(ranges).toEqual([

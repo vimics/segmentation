@@ -52,7 +52,7 @@ async function fakeStorage(page: Page) {
     seen.hosts.add(new URL(req.url()).host);
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
     seen.record = req.postDataJSON().case;
-    return route.fulfill({ status: 200, headers: cors, json: { caseId: 'BV-20261031-ABC123', uploadUrl: 'https://vimics.sharepoint.com/up/session' } });
+    return route.fulfill({ status: 200, headers: cors, json: { caseId: 'VS-20261031-ABC123', uploadUrl: 'https://vimics.sharepoint.com/up/session' } });
   });
   await page.route('https://vimics.sharepoint.com/**', async (route) => {
     const req = route.request();
@@ -227,42 +227,25 @@ test.describe('file formats in real workers, under the production security polic
     await expect(page.locator('#ozet')).toContainText('64');
   });
 
-  test('picks among series and lets the vet switch', async ({ page }) => {
+  test('opens the series with the most slices and offers no choice', async ({ page }) => {
     await fakeStorage(page);
     const a = spherePhantom({ radiusMm: 12, count: 64 }).slices.map((s) => ({ ...s, seriesUid: '1.2.3.1' }));
     const b = spherePhantom({ radiusMm: 6, size: 32, count: 32 }).slices.map((s) => ({ ...s, seriesUid: '1.2.3.2', instance: s.instance + 1000 }));
-    await open(page, asFiles([...a, ...b]));
+    await open(page, asFiles([...b, ...a]));
     await waitForModel(page);
-    await expect(page.locator('#seri option')).toHaveCount(2);
     await expect(page.locator('#ozet')).toContainText('64 slices');
-    await page.selectOption('#seri', { index: 1 });
-    await expect(page.locator('#ozet')).toContainText('32 slices', { timeout: 60_000 });
+    await expect(page.locator('#seri')).toHaveCount(0);
+    await expect(page.locator('.ray .etiket', { hasText: 'Series' })).toHaveCount(0);
   });
 
-  test('switching series keeps the chosen threshold, and a new case resets it', async ({ page }) => {
-    await fakeStorage(page);
-    const a = spherePhantom({ radiusMm: 12, count: 64 }).slices.map((s) => ({ ...s, seriesUid: '1.2.3.1' }));
-    const b = spherePhantom({ radiusMm: 6, size: 32, count: 32 }).slices.map((s) => ({ ...s, seriesUid: '1.2.3.2', instance: s.instance + 1000 }));
-    await open(page, asFiles([...a, ...b]));
-    await waitForModel(page);
-    await page.fill('#esik-sayi-min', '400');
-    await page.locator('#esik-sayi-min').blur();
-    await page.fill('#esik-sayi-max', '1500');
-    await page.locator('#esik-sayi-max').blur();
-    await page.selectOption('#seri', { index: 1 });
-    await expect(page.locator('#ozet')).toContainText('32 slices', { timeout: 60_000 });
-    await expect(page.locator('#esik-sayi-min')).toHaveValue('400');
-    await expect(page.locator('#esik-sayi-max')).toHaveValue('1500');
-  });
-
-  test('one usable series shows no choice, and scouts and dose reports are never listed', async ({ page }) => {
+  test('scouts and dose reports never get in the way', async ({ page }) => {
     await fakeStorage(page);
     const main = spherePhantom({ radiusMm: 12 }).slices.map((s) => ({ ...s, seriesUid: '1.2.3.1', kernel: 'B70f', description: 'Spine' }));
     const scout = { ...main[0], seriesUid: '1.2.3.2', imageType: 'ORIGINAL\\PRIMARY\\LOCALIZER', instance: 900 };
     const dose = { ...main[0], seriesUid: '1.2.3.3', samples: 3, instance: 901 };
     await open(page, asFiles([scout, dose, ...main]));
     await waitForModel(page);
-    await expect(page.locator('#seri-bolme')).toBeHidden();
+    await expect(page.locator('#uyarilar')).toBeHidden();
   });
 
   test('a real-world mix loads: DICOM with BMP copies, a viewer program and a readme', async ({ page }) => {
@@ -290,7 +273,7 @@ test.describe('file formats in real workers, under the production security polic
   });
 
   test('a corrupt slice is left out with a warning', async ({ page }) => {
-    await fakeStorage(page);
+    const seen = await fakeStorage(page);
     const files = sphereFiles();
     // Cuts the file in the pixel data: the header is still readable, the slice is not.
     files[20] = { ...files[20], buffer: files[20].buffer.subarray(0, files[20].buffer.length - 3000) };
@@ -298,6 +281,9 @@ test.describe('file formats in real workers, under the production security polic
     await waitForModel(page);
     await expect(page.locator('#uyarilar')).toContainText('1 slice could not be read');
     await expect(page.locator('#ozet')).toContainText('63');
+    // It still stores, without the bad slice.
+    await expect(page.locator('#depo-ref')).toHaveText('VS-20261031-ABC123', { timeout: 30_000 });
+    expect((seen.record as unknown as { files: number }).files).toBe(63);
   });
 });
 
@@ -311,7 +297,7 @@ test.describe('demo cases', () => {
       await page.getByRole('button', { name, exact: true }).click();
       await page.locator('#ozet', { hasText: 'triangles' }).waitFor({ timeout: 85_000 });
       await expect(page.locator('#vaka')).toContainText('Patient details removed');
-      await expect(page.locator('#seri-bolme')).toBeHidden();
+      await expect(page.locator('#uyarilar')).toBeHidden();
       await expect(page.locator('#vaka')).toContainText(species === 'Cat' ? 'Cat' : 'Dog');
       await expect(page.locator('#esik-sayi-min')).toHaveValue('226');
       await expect(page.locator('#esik-sayi-max')).toHaveValue('1988');
@@ -506,22 +492,35 @@ test.describe('filters and structures', () => {
     await expect.poll(() => triangles(page)).toBe(before);
   });
 
-  test('a choice of series keeps its dropdown and warnings stay without the label', async ({ page }) => {
+  test('warnings appear above the threshold, with no label', async ({ page }) => {
     await fakeStorage(page);
-    const a = spherePhantom({ radiusMm: 12, count: 64 }).slices.map((s) => ({ ...s, seriesUid: '1.2.3.1' }));
-    const b = spherePhantom({ radiusMm: 6, size: 32, count: 32 }).slices.map((s) => ({ ...s, seriesUid: '1.2.3.2', instance: s.instance + 1000 }));
-    await open(page, asFiles([...a, ...b]));
-    await waitForModel(page);
-    await expect(page.locator('#seri-etiket')).toBeVisible();
-    await expect(page.locator('#seri')).toBeVisible();
-
     const { slices } = spherePhantom({ radiusMm: 12 });
     await open(page, asFiles(slices.filter((s) => s.instance !== 20)));
     await waitForModel(page);
+    await expect(page.locator('#uyarilar')).toBeVisible();
     await expect(page.locator('#uyarilar')).toContainText('1 slice is missing');
-    await expect(page.locator('#seri-etiket')).toBeHidden();
-    await expect(page.locator('#seri')).toBeHidden();
   });
+});
+
+test.describe('small screens', () => {
+  for (const [label, width, height] of [['phone', 390, 844], ['tablet', 820, 1180]] as const) {
+    test(`nothing is cut off on a ${label}`, async ({ browser }) => {
+      const context = await browser.newContext({ viewport: { width, height }, hasTouch: true, isMobile: true });
+      const page = await context.newPage();
+      await page.goto('/');
+      await page.click('#ornek');
+      await waitForModel(page);
+      for (const selector of ['#gonder', '#yeni-vaka', '#sigdir', '.kup-kap', '.yakinda', '#esik-sayi-max', '#aralik', '#esik-not', '#ozet']) {
+        const box = (await page.locator(selector).first().boundingBox())!;
+        expect(box.x, `${selector} left`).toBeGreaterThanOrEqual(-1);
+        expect(box.x + box.width, `${selector} right`).toBeLessThanOrEqual(width + 1);
+      }
+      const summary = (await page.locator('#ozet').boundingBox())!, cube = (await page.locator('.kup-kap').boundingBox())!;
+      const overlap = summary.x + summary.width > cube.x && summary.y + summary.height > cube.y && summary.y < cube.y + cube.height;
+      expect(overlap, 'summary runs under the cube').toBe(false);
+      await context.close();
+    });
+  }
 });
 
 test.describe('rotating the view', () => {
@@ -733,7 +732,7 @@ test.describe('case storage', () => {
     const problems = collectProblems(page);
     await open(page, sphereFiles(), { breed: 'Beagle', clinician: 'Jane Doe' });
     await waitForModel(page);
-    await expect(page.locator('#depo-ref')).toHaveText('BV-20261031-ABC123', { timeout: 30_000 });
+    await expect(page.locator('#depo-ref')).toHaveText('VS-20261031-ABC123', { timeout: 30_000 });
 
     const record = seen.record as unknown as {
       consent: { version: string; text: string; acceptedAt: string };
@@ -780,7 +779,7 @@ test.describe('case storage', () => {
       const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': '*', 'Access-Control-Allow-Headers': '*' };
       if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
       if (refuse) return route.fulfill({ status: 503, headers: cors, json: { error: 'Storage is unavailable.' } });
-      return route.fulfill({ status: 200, headers: cors, json: { caseId: 'BV-RETRY', uploadUrl: 'https://vimics.sharepoint.com/up/session' } });
+      return route.fulfill({ status: 200, headers: cors, json: { caseId: 'VS-RETRY', uploadUrl: 'https://vimics.sharepoint.com/up/session' } });
     });
     await open(page, sphereFiles());
     await waitForModel(page);
@@ -788,7 +787,7 @@ test.describe('case storage', () => {
     await expect(page.locator('#yapilar li')).toHaveCount(1);
     refuse = false;
     await page.click('#depo-tekrar');
-    await expect(page.locator('#depo-ref')).toHaveText('BV-RETRY', { timeout: 30_000 });
+    await expect(page.locator('#depo-ref')).toHaveText('VS-RETRY', { timeout: 30_000 });
     expect(seen.chunks.length).toBeGreaterThan(0);
   });
 });

@@ -60,7 +60,7 @@ const isText = (v: unknown, max: number): v is string => typeof v === 'string' &
 const isOptionalText = (v: unknown, max: number) => v === null || isText(v, max);
 const isNumber = (v: unknown, min: number, max: number): v is number => typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
 
-/** Rejects anything but the expected shape, so the endpoint can't store arbitrary JSON. */
+/** Checks the expected shape and rebuilds the record from those fields alone, so nothing else can be stored. */
 export function validateCase(body: unknown, maxZip: number): Record<string, unknown> {
   const c = (body as { case?: Record<string, never> } | null)?.case as Record<string, Record<string, unknown> & unknown> | undefined;
   const bad = (what: string) => new HttpError(400, `Invalid case: ${what}.`);
@@ -78,16 +78,43 @@ export function validateCase(body: unknown, maxZip: number): Record<string, unkn
   if (!study || typeof study !== 'object') throw bad('study');
   if (!isNumber(study.slices, 1, 100_000) || !isNumber(study.rows, 1, 16_384) || !isNumber(study.cols, 1, 16_384)) throw bad('study size');
   for (const key of ['manufacturer', 'model', 'kernel', 'dicomSpecies', 'dicomBreed']) if (!isText(study[key], LIMITS.text)) throw bad(key);
+  if (!isOptionalText(study.date, 20)) throw bad('study date');
+  if (!isNumber(study.sliceSpacingMm, 0, 1000)) throw bad('slice spacing');
+  const spacing = study.pixelSpacingMm as unknown;
+  if (spacing !== null && !(Array.isArray(spacing) && spacing.length === 2 && spacing.every((v) => isNumber(v, 0, 100)))) throw bad('pixel spacing');
+  if (!isText(c.appVersion as unknown, 40)) throw bad('app version');
   if (!viewer || !isNumber(viewer.thresholdMinHu, -1024, 4000) || !isNumber(viewer.thresholdMaxHu, -1024, 4000)) throw bad('viewer');
   if (!isNumber(c.files as unknown, 1, 100_000)) throw bad('files');
   if (!isNumber(c.zipBytes as unknown, 1, maxZip)) throw new HttpError(413, 'This scan is larger than the storage limit.');
-  return c as unknown as Record<string, unknown>;
+  return {
+    schema: 1,
+    appVersion: c.appVersion,
+    consent: { version: consent.version, text: consent.text, acceptedAt: consent.acceptedAt },
+    patient: { name: patient.name, species: patient.species, breed: patient.breed, ageMonths: patient.ageMonths, weightKg: patient.weightKg },
+    clinician: c.clinician,
+    study: {
+      date: study.date,
+      manufacturer: study.manufacturer,
+      model: study.model,
+      kernel: study.kernel,
+      slices: study.slices,
+      rows: study.rows,
+      cols: study.cols,
+      pixelSpacingMm: spacing,
+      sliceSpacingMm: study.sliceSpacingMm,
+      dicomSpecies: study.dicomSpecies,
+      dicomBreed: study.dicomBreed,
+    },
+    viewer: { thresholdMinHu: viewer.thresholdMinHu, thresholdMaxHu: viewer.thresholdMaxHu },
+    files: c.files,
+    zipBytes: c.zipBytes,
+  };
 }
 
 function newCaseId(now: Date): string {
   const stamp = now.toISOString().slice(0, 10).replaceAll('-', '');
   const random = Array.from(crypto.getRandomValues(new Uint8Array(5)), (b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
-  return `BV-${stamp}-${random}`;
+  return `VS-${stamp}-${random}`;
 }
 
 async function verifyBot(env: Env, token: unknown, ip: string) {
@@ -115,7 +142,7 @@ async function createCase(request: Request, env: Env): Promise<Response> {
 
   const now = new Date();
   const caseId = newCaseId(now);
-  const root = env.ROOT_FOLDER ?? 'BoneViewer';
+  const root = env.ROOT_FOLDER ?? 'V-Seg';
   const folder = `${root}/${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, '0')}/${caseId}`;
   const token = await graphToken(env);
   const auth = { Authorization: `Bearer ${token}` };

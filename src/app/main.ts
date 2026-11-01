@@ -1,4 +1,4 @@
-import { describeSeries, mainReason, mixedUploadWarning, pickBestSeries } from '../engine/dicom/series';
+import { mainReason, mixedUploadWarning, pickBestSeries } from '../engine/dicom/series';
 import { toSources, type Source } from '../engine/io/sources';
 import { assembleVolume, scanSeries } from '../engine/load';
 import { fetchDemo } from '../engine/demo';
@@ -43,7 +43,7 @@ document.querySelectorAll<HTMLButtonElement>('[data-species]').forEach((b) => b.
   setFieldError('species');
 }));
 
-const savedClinician = localStorage.getItem('bv-clinician');
+const savedClinician = localStorage.getItem('vseg-clinician');
 if (savedClinician) $<HTMLInputElement>('f-clinician').value = savedClinician;
 
 function setChosen(files: File[]) {
@@ -81,8 +81,8 @@ $<HTMLFormElement>('form').addEventListener('submit', (e) => {
     document.querySelector<HTMLElement>('.hatali input, .hatali button')?.focus();
     return;
   }
-  if (details.clinician) localStorage.setItem('bv-clinician', details.clinician);
-  else localStorage.removeItem('bv-clinician');
+  if (details.clinician) localStorage.setItem('vseg-clinician', details.clinician);
+  else localStorage.removeItem('vseg-clinician');
   void openCase(details, chosenFiles, new Date().toISOString());
 });
 
@@ -250,6 +250,9 @@ function applyVisibility() {
   renderSummary();
   renderSurfaceHint();
 }
+
+// Closing the tab stops an upload for good, since retries only cover network failures.
+window.addEventListener('beforeunload', (e) => { if (store.busy) e.preventDefault(); });
 
 $('filtre-parca').addEventListener('change', (e) => {
   filters.fragments = (e.target as HTMLInputElement).checked;
@@ -522,7 +525,7 @@ function storeCurrent() {
 
 // ---- Loading a case ---------------------------------------------------------------------------
 
-function resetForNewModel(keepThreshold = false) {
+function resetForNewModel() {
   meshWorker?.terminate();
   meshWorker = null;
   latestSurface = null;
@@ -536,21 +539,12 @@ function resetForNewModel(keepThreshold = false) {
   $('uyarilar').replaceChildren();
   viewer?.setTool(null);
   viewer?.clearMeasurements();
-  if (!keepThreshold) {
-    setThreshold(BONE_RANGE.min, BONE_RANGE.max);
-    filters.shells = filters.fragments = true;
-    $<HTMLInputElement>('filtre-kabuk').checked = true;
-    $<HTMLInputElement>('filtre-parca').checked = true;
-    $<HTMLDetailsElement>('yapilar-bolme').open = false;
-  }
-  syncSeriesBlock();
-}
-
-/** The block only appears when there is a real choice of series or something to warn about. */
-function syncSeriesBlock() {
-  const choice = !$<HTMLSelectElement>('seri').hidden;
-  $('seri-etiket').hidden = !choice;
-  $('seri-bolme').hidden = !choice && !$('uyarilar').childElementCount;
+  setThreshold(BONE_RANGE.min, BONE_RANGE.max);
+  filters.shells = filters.fragments = true;
+  $<HTMLInputElement>('filtre-kabuk').checked = true;
+  $<HTMLInputElement>('filtre-parca').checked = true;
+  $<HTMLDetailsElement>('yapilar-bolme').open = false;
+  $('uyarilar').hidden = true;
 }
 
 function startMesh(request: MeshRequest, transfer: Transferable[], frame: { rowDir: Vec3; colDir: Vec3 }) {
@@ -595,18 +589,18 @@ function startMesh(request: MeshRequest, transfer: Transferable[], frame: { rowD
 /** Can be fewer than the series lists, when unreadable slices were left out. */
 let builtSlices = 0;
 
-async function buildSeries(selected: SeriesInfo, keepThreshold = false) {
+async function buildSeries(selected: SeriesInfo) {
   if (!current) return;
   current.selected = selected;
-  resetForNewModel(keepThreshold);
-  $('seri-bilgi').textContent = current.series.filter((s) => s.usable).length < 2 ? '' : selected.description;
+  resetForNewModel();
   show('loading');
   setStep(1, `0 / ${num(selected.slices.length)}`, 30);
   try {
-    const { volume, step, failedSlices } = await assembleVolume(selected, current.sources, (done, total) => {
+    const { volume, step, failedSlices, readable } = await assembleVolume(selected, current.sources, (done, total) => {
       setStep(1, `${num(done)} / ${num(total)}`, 30 + (done / total) * 55);
     });
     builtSlices = volume.nz;
+    current.selected = { ...selected, slices: readable };
     const warnings = [...current.uploadWarnings, ...selected.warnings];
     if (failedSlices) warnings.push(`${failedSlices} ${failedSlices === 1 ? 'slice' : 'slices'} could not be read and ${failedSlices === 1 ? 'was' : 'were'} left out.`);
     if (step > 1) warnings.push('This scan is very large, so it was reduced to half resolution to fit in memory.');
@@ -619,7 +613,7 @@ async function buildSeries(selected: SeriesInfo, keepThreshold = false) {
       p.textContent = w;
       box.append(p);
     }
-    syncSeriesBlock();
+    box.hidden = !warnings.length;
     if (current.details) {
       $('vaka-rozet').hidden = true;
       const line = caseLine(current.details, formatStudyDate(selected.slices[0].studyDate));
@@ -657,12 +651,6 @@ async function openCase(details: CaseDetails, files: File[], acceptedAt: string)
     const mixed = mixedUploadWarning(series);
     if (mixed) uploadWarnings.unshift(mixed);
     current = { details, acceptedAt, sources, series, selected: best, sample: false, uploadWarnings };
-    const select = $<HTMLSelectElement>('seri');
-    select.replaceChildren();
-    // Scouts and dose reports never appear. The default comes first, then the rest by size.
-    const choices = series.filter((s) => s.usable).sort((a, b) => Number(b === best) - Number(a === best) || b.slices.length - a.slices.length);
-    for (const s of choices) select.add(new Option(describeSeries(s, series), String(series.indexOf(s)), false, s === best));
-    select.hidden = choices.length < 2;
     $('depo').hidden = false;
     renderStore({ kind: 'off', message: 'Waiting for the model.' });
     await buildSeries(best);
@@ -671,15 +659,7 @@ async function openCase(details: CaseDetails, files: File[], acceptedAt: string)
   }
 }
 
-$<HTMLSelectElement>('seri').addEventListener('change', (e) => {
-  const s = current?.series[+(e.target as HTMLSelectElement).value];
-  if (s) void buildSeries(s, true);
-});
-
 function showExampleChrome(badge: string, line: string) {
-  $<HTMLSelectElement>('seri').hidden = true;
-  $('seri-bilgi').textContent = '';
-  syncSeriesBlock();
   $('depo').hidden = true;
   $('vaka-rozet').textContent = badge;
   $('vaka-rozet').hidden = false;
@@ -722,7 +702,7 @@ function backToStart() {
   current = null;
   setChosen([]);
   $<HTMLFormElement>('form').reset();
-  const clinician = localStorage.getItem('bv-clinician');
+  const clinician = localStorage.getItem('vseg-clinician');
   if (clinician) $<HTMLInputElement>('f-clinician').value = clinician;
   species = '';
   document.querySelectorAll('[data-species]').forEach((o) => { o.setAttribute('aria-checked', 'false'); o.setAttribute('aria-pressed', 'false'); });

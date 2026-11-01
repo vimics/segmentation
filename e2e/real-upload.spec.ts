@@ -39,7 +39,7 @@ for (const label of CASES) {
         const record = req.postDataJSON().case;
         zipBytes = record.zipBytes;
         files = record.files;
-        return route.fulfill({ status: 200, headers: cors, json: { caseId: 'BV-TEST', uploadUrl: 'https://vimics.sharepoint.com/upload' } });
+        return route.fulfill({ status: 200, headers: cors, json: { caseId: 'VS-TEST', uploadUrl: 'https://vimics.sharepoint.com/upload' } });
       }
       if (url.hostname === 'vimics.sharepoint.com') {
         chunks++;
@@ -66,7 +66,7 @@ for (const label of CASES) {
       await page.locator('#ozet', { hasText: 'triangles' }).waitFor({ timeout: 900_000 });
       const modelSeconds = (Date.now() - started) / 1000;
       const peakAtModel = peak;
-      await expect(page.locator('#depo')).toContainText('BV-TEST', { timeout: 1_200_000 });
+      await expect(page.locator('#depo')).toContainText('VS-TEST', { timeout: 1_200_000 });
       writeFileSync(join(OUT, `${label}-upload.json`), JSON.stringify({
         modelSeconds: +modelSeconds.toFixed(1),
         storedSeconds: +((Date.now() - started) / 1000).toFixed(1),

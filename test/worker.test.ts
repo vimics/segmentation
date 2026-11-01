@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import service, { isAllowedUploadUrl, type Env } from '../worker/src/index';
+import service, { validateCase, isAllowedUploadUrl, type Env } from '../worker/src/index';
 
 const ORIGIN = 'https://umuttutal.github.io';
 const env: Env = { TENANT_ID: 't', CLIENT_ID: 'c', CLIENT_SECRET: 'SECRET', DRIVE_ID: 'drive1', ALLOWED_ORIGINS: `${ORIGIN},https://vimics.vet`, MAX_CASES_PER_HOUR: '1000' };
@@ -42,6 +42,21 @@ describe('upload service', () => {
   beforeEach(() => { calls = fakeMicrosoft(); });
   afterEach(() => vi.unstubAllGlobals());
 
+  it('stores only the expected fields, whatever else is sent', () => {
+    const body = { case: { ...validCase(), junk: 'x'.repeat(100), patient: { ...validCase().patient, note: 'extra' }, study: { ...validCase().study, owner: 'extra' } } };
+    const stored = JSON.stringify(validateCase(body, 1e9));
+    expect(stored).not.toContain('junk');
+    expect(stored).not.toContain('extra');
+    expect(stored).toContain('"name":"Max"');
+    expect(stored).toContain('"thresholdMinHu":226');
+  });
+
+  it('rejects a study date or spacing of the wrong shape', () => {
+    for (const study of [{ date: 'x'.repeat(21) }, { date: 5 }, { sliceSpacingMm: 'a' }, { pixelSpacingMm: [1] }, { pixelSpacingMm: 'a' }]) {
+      expect(() => validateCase({ case: { ...validCase(), study: { ...validCase().study, ...study } } }, 1e9)).toThrow(/Invalid case/);
+    }
+  });
+
   it('stores case.json and returns a one-time link, without leaking credentials', async () => {
     const r = await service.fetch(post({ case: validCase() }), env);
     expect(r.status).toBe(200);
@@ -50,11 +65,11 @@ describe('upload service', () => {
     expect(text).not.toContain('SECRET');
     expect(text).not.toContain('GRAPH_TOKEN');
     const { caseId, uploadUrl } = JSON.parse(text);
-    expect(caseId).toMatch(/^BV-\d{8}-[0-9A-F]{10}$/);
+    expect(caseId).toMatch(/^VS-\d{8}-[0-9A-F]{10}$/);
     expect(uploadUrl).toBe('https://vimics.sharepoint.com/up/xyz');
 
     const stored = calls.find((c) => c.url.endsWith(':/content'))!;
-    expect(stored.url).toMatch(new RegExp(`/drives/drive1/root:/BoneViewer/\\d{4}/\\d{2}/${caseId}/case.json:/content$`));
+    expect(stored.url).toMatch(new RegExp(`/drives/drive1/root:/V-Seg/\\d{4}/\\d{2}/${caseId}/case.json:/content$`));
     const json = JSON.parse(String(stored.init.body));
     expect(json.caseId).toBe(caseId);
     expect(json.patient.name).toBe('Max');

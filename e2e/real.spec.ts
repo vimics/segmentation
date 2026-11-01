@@ -79,8 +79,6 @@ for (const label of CASES) {
       // The header line is left out of the report on purpose. It holds only placeholders here, but the habit matters.
       await page.waitForTimeout(1500);
       shot.summary = await page.locator('#ozet').textContent();
-      shot.seriesInfo = await page.locator('#seri-bilgi').textContent();
-      shot.seriesChoices = await page.locator('#seri option').allTextContents();
       shot.warnings = await page.locator('#uyarilar p').allTextContents();
       shot.structures = await page.locator('#yapilar li').allTextContents();
       shot.filterNote = await page.locator('#filtre-not').textContent();

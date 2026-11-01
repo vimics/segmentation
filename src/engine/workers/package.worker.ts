@@ -34,9 +34,15 @@ scope.onmessage = async (e: MessageEvent<PackageRequest>) => {
 
     let written = 0;
     for (let i = 0; i < sources.length; i++) {
-      const ds = parseDataset(await readSource(sources[i]));
-      if (!ds) continue;
-      const clean = await deidentify(ds, salt);
+      // A file that can't be cleaned is left out, because only cleaned files may ever leave this computer.
+      let clean: Uint8Array;
+      try {
+        const ds = parseDataset(await readSource(sources[i]));
+        if (!ds) continue;
+        clean = await deidentify(ds, salt);
+      } catch {
+        continue;
+      }
       const entry = new ZipDeflate(`slice-${String(i + 1).padStart(5, '0')}.dcm`, { level: 6 });
       zip.add(entry);
       entry.push(clean, true);
