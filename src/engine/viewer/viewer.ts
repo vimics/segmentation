@@ -566,7 +566,7 @@ export class Viewer {
   }
 
   /** The model, a scale bar and the Vimics mark. Never any patient or owner details. */
-  async snapshot(background: string, ink: string, logoMarkup: string): Promise<Blob> {
+  async snapshot(background: string, ink: string, logoMarkup: string, caption: string): Promise<Blob> {
     this.render();
     const canvas = this.el.canvas, w = canvas.width, h = canvas.height, ratio = this.renderer.getPixelRatio();
     const out = document.createElement('canvas');
@@ -592,11 +592,20 @@ export class Viewer {
     ctx.lineTo(x + scale * pxPerMm, y - 6 * ratio);
     ctx.stroke();
 
+    // The case details sit beside the scale bar, shortened if the image is too narrow for them.
+    const captionX = x + scale * pxPerMm + 16 * ratio, room = w - captionX - 24 * ratio;
+    let text = caption;
+    while (text && ctx.measureText(text).width > room) text = text.slice(0, -2).trimEnd() + '…';
+    if (text.length > 1) ctx.fillText(text, captionX, y);
+
     const img = new Image();
     await new Promise((res) => { img.onload = res; img.onerror = res; img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(logoMarkup)}`; });
     if (img.width) {
-      const lh = 26 * ratio, lw = lh * (2000 / 362);
-      ctx.drawImage(img, w - lw - 20 * ratio, 16 * ratio, lw, lh);
+      const lh = 34 * ratio, lw = lh * (2000 / 362), lx = w - lw - 20 * ratio, ly = 16 * ratio;
+      ctx.drawImage(img, lx, ly, lw, lh);
+      ctx.textAlign = 'right';
+      ctx.fillText('vimics.vet', lx + lw, ly + lh + 16 * ratio);
+      ctx.textAlign = 'left';
     }
     return new Promise((resolve, reject) => out.toBlob((b) => (b ? resolve(b) : reject(new Error('Snapshot failed'))), 'image/png'));
   }

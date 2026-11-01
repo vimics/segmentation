@@ -171,7 +171,16 @@ test.describe('viewer', () => {
     await page.click('#aksiyon-gizle');
     await expect(page.locator('#yapilar input:not(:checked)')).toHaveCount(1);
 
+    await page.evaluate(() => {
+      const drawn: string[] = [];
+      (window as unknown as { drawn: string[] }).drawn = drawn;
+      const original = CanvasRenderingContext2D.prototype.fillText;
+      CanvasRenderingContext2D.prototype.fillText = function (text: string, x: number, y: number) { drawn.push(text); original.call(this, text, x, y); };
+    });
     const [download] = await Promise.all([page.waitForEvent('download'), page.click('#goruntu')]);
+    const drawn = await page.evaluate(() => (window as unknown as { drawn: string[] }).drawn);
+    expect(drawn).toContain('vimics.vet');
+    expect(drawn.some((t) => t.startsWith('Generated vertebrae'))).toBe(true);
     expect(download.suggestedFilename()).toBe('vimics-v-seg.png');
   });
 });
@@ -510,7 +519,8 @@ test.describe('small screens', () => {
       await page.goto('/');
       await page.click('#ornek');
       await waitForModel(page);
-      for (const selector of ['#gonder', '#yeni-vaka', '#sigdir', '.kup-kap', '.yakinda', '#esik-sayi-max', '#aralik', '#esik-not', '#ozet']) {
+      expect((await page.locator('.logo-link svg').boundingBox())!.width).toBeGreaterThan(80);
+      for (const selector of ['.logo-link svg', '#gonder', '#yeni-vaka', '#sigdir', '.kup-kap', '.yakinda', '#esik-sayi-max', '#aralik', '#esik-not', '#ozet']) {
         const box = (await page.locator(selector).first().boundingBox())!;
         expect(box.x, `${selector} left`).toBeGreaterThanOrEqual(-1);
         expect(box.x + box.width, `${selector} right`).toBeLessThanOrEqual(width + 1);
