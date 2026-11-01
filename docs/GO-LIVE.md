@@ -164,6 +164,7 @@ The tool's "Send a case" button already opens `/dicom/`.
 | De-identification on all 2,704 chosen real slices | No private tags, original IDs or name fields left |
 | Upload path with a simulated SharePoint | Worked at 193 and 304 MB, including a dropped connection |
 | Running from a subfolder, with no absolute paths | Works |
+| Live site in Chrome's, Firefox's and Safari's engines | All 18 checks pass in each: demos, messy folders, JPEG 2000, rotation, sliders, filters |
 | Phone and tablet layout | Nothing cut off |
 | Automated tests | 164 unit and 49 browser tests pass |
 
