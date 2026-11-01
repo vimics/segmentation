@@ -11,7 +11,7 @@ const validCase = () => ({
   patient: { name: 'Max', species: 'Dog', breed: null, ageMonths: 38, weightKg: 12.4 },
   clinician: null,
   study: { date: null, manufacturer: 'A', model: 'B', kernel: 'C', slices: 10, rows: 512, cols: 512, pixelSpacingMm: [0.5, 0.5], sliceSpacingMm: 0.6, dicomSpecies: '', dicomBreed: '' },
-  viewer: { thresholdMinHu: 226, thresholdMaxHu: 1988 },
+  viewer: { thresholdMinHu: 300, thresholdMaxHu: 1900 },
   files: 10,
   zipBytes: 1000,
 });
@@ -48,7 +48,7 @@ describe('upload service', () => {
     expect(stored).not.toContain('junk');
     expect(stored).not.toContain('extra');
     expect(stored).toContain('"name":"Max"');
-    expect(stored).toContain('"thresholdMinHu":226');
+    expect(stored).toContain('"thresholdMinHu":300');
   });
 
   it('rejects a study date or spacing of the wrong shape', () => {

@@ -92,9 +92,18 @@ test.describe('start page', () => {
     await page.goto('/');
     await expect(page.locator('h1').first()).toHaveText('Inspect bone anatomy in 3D.');
     await expect(page.locator('body')).not.toContainText('Veterinary CT to 3D');
-    await expect(page.locator('.alt-orta')).toContainText('Not suitable for surgical planning or 3D printing');
+    await expect(page.locator('.alt-orta')).toContainText('Not suitable for surgical planning or 3D printing, which require human inspection with local masking on medical software.');
     await expect(page.locator('.alt-sag')).toContainText('© 2026 Vimics');
     await expect(page.locator('body')).not.toContainText(/nothing (is )?uploaded/i);
+  });
+
+  test('the bottom strip wraps instead of running into the copyright line', async ({ page }) => {
+    await page.goto('/');
+    for (const width of [1280, 1100, 1024, 900]) {
+      await page.setViewportSize({ width, height: 768 });
+      const text = (await page.locator('.alt-orta').boundingBox())!, rights = (await page.locator('.alt-sag').boundingBox())!;
+      expect(text.x + text.width).toBeLessThanOrEqual(rights.x);
+    }
   });
 });
 
@@ -157,7 +166,7 @@ test.describe('viewer', () => {
     await page.press('#esik-sayi-min', 'Enter');
     await expect(page.locator('#esik-sayi-max')).toHaveValue('3001');
     await expect(page.locator('#ipucu')).toContainText('No surface at this threshold', { timeout: 30_000 });
-    await page.fill('#esik-sayi-min', '226');
+    await page.fill('#esik-sayi-min', '300');
     await page.press('#esik-sayi-min', 'Enter');
     await expect(page.locator('#ipucu')).toBeHidden({ timeout: 30_000 });
     await page.locator('#iyilestir[hidden]').waitFor({ state: 'attached', timeout: 30_000 });
@@ -309,8 +318,8 @@ test.describe('demo cases', () => {
       await expect(page.locator('#vaka')).toContainText('Patient details removed');
       await expect(page.locator('#uyarilar')).toBeHidden();
       await expect(page.locator('#vaka')).toContainText(species === 'Cat' ? 'Cat' : 'Dog');
-      await expect(page.locator('#esik-sayi-min')).toHaveValue('226');
-      await expect(page.locator('#esik-sayi-max')).toHaveValue('1988');
+      await expect(page.locator('#esik-sayi-min')).toHaveValue('300');
+      await expect(page.locator('#esik-sayi-max')).toHaveValue('1900');
       await expect(page.locator('#depo')).toBeHidden();
       expect(outgoing).toEqual([]);
       expect(problems).toEqual([]);
@@ -319,13 +328,13 @@ test.describe('demo cases', () => {
 });
 
 test.describe('threshold selector', () => {
-  const NOTE = 'We normally expect cortical and cancellous bones between 226 - 1988 Hounsfield units, but shifts can occur due to the calibration, tube voltage and reconstruction filters. Use threshold slider to adjust for shifts and eliminate noise.';
+  const NOTE = 'We normally expect cortical and cancellous bones between 300 - 1900 Hounsfield units, but shifts can occur due to the calibration, tube voltage and reconstruction filters. Use threshold slider to adjust for shifts and eliminate noise.';
 
-  test('opens at 226 to 1988 with the note and no presets, and the ends cannot cross', async ({ page }) => {
+  test('opens at 300 to 1900 with the note and no presets, and the ends cannot cross', async ({ page }) => {
     await open(page, sphereFiles());
     await waitForModel(page);
-    await expect(page.locator('#esik-min')).toHaveValue('226');
-    await expect(page.locator('#esik-max')).toHaveValue('1988');
+    await expect(page.locator('#esik-min')).toHaveValue('300');
+    await expect(page.locator('#esik-max')).toHaveValue('1900');
     await expect(page.locator('#esik-min')).toHaveAttribute('min', '-1024');
     await expect(page.locator('#esik-max')).toHaveAttribute('max', '4000');
     await expect(page.locator('#esik-not')).toHaveText(NOTE);
@@ -333,8 +342,8 @@ test.describe('threshold selector', () => {
 
     // Dragging one thumb past the other stops it there.
     await page.locator('#esik-min').evaluate((el: HTMLInputElement) => { el.value = '3500'; el.dispatchEvent(new Event('input', { bubbles: true })); });
-    await expect(page.locator('#esik-sayi-min')).toHaveValue('1987');
-    await expect(page.locator('#esik-sayi-max')).toHaveValue('1988');
+    await expect(page.locator('#esik-sayi-min')).toHaveValue('1899');
+    await expect(page.locator('#esik-sayi-max')).toHaveValue('1900');
   });
 
   test('both thumbs can be grabbed with the pointer', async ({ page }) => {
@@ -343,13 +352,13 @@ test.describe('threshold selector', () => {
     const box = (await page.locator('#aralik').boundingBox())!;
     const at = (hu: number) => box.x + ((hu + 1024) / 5024) * box.width;
     const y = box.y + box.height / 2;
-    await page.mouse.move(at(1988), y);
+    await page.mouse.move(at(1900), y);
     await page.mouse.down();
     await page.mouse.move(at(3000), y, { steps: 4 });
     await page.mouse.up();
     expect(+(await page.locator('#esik-sayi-max').inputValue())).toBeGreaterThan(2500);
-    await expect(page.locator('#esik-sayi-min')).toHaveValue('226');
-    await page.mouse.move(at(226), y);
+    await expect(page.locator('#esik-sayi-min')).toHaveValue('300');
+    await page.mouse.move(at(300), y);
     await page.mouse.down();
     await page.mouse.move(at(800), y, { steps: 4 });
     await page.mouse.up();

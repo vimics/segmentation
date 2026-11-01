@@ -39,7 +39,7 @@ Put real test scans in `test-data/`. That folder is ignored by git and must stay
 - **De-identification is an allow-list.** `KEEP` in `src/engine/dicom/deidentify.ts` lists what survives, and everything else is dropped. Never add a free-text field to it.
 - **No secrets in this repository.** It is public. SharePoint credentials exist only as Cloudflare secrets.
 - **Geometry is true millimetres in patient space.** Vertices use each slice's recorded position, and nothing is resampled. The phantom tests in `test/surface.test.ts` check this.
-- **The threshold is the vet's.** Every scan is capped to −1024 to 4000 HU and opens at 226 to 1988 HU. Nothing is normalized or chosen per scan.
+- **The threshold is the vet's.** Every scan is capped to −1024 to 4000 HU and opens at 300 to 1900 HU. Nothing is normalized or chosen per scan.
 - **Real scans never enter the repository.** Only files built by `tools/make-demo.run.ts` do. Findings are written by case label, with no names.
 - **The page discloses storage.** The start page, consent checkbox and `privacy.html` must match what the code sends.
 

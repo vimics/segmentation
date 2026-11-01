@@ -5,4 +5,4 @@ export const HU_MAX = 4000;
 export interface HuRange { min: number; max: number; }
 
 /** Where the threshold starts on every scan. Nothing is adjusted per scan: the vet moves the selector. */
-export const BONE_RANGE: HuRange = { min: 226, max: 1988 };
+export const BONE_RANGE: HuRange = { min: 300, max: 1900 };

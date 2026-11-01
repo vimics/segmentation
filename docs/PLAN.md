@@ -28,7 +28,7 @@ Viewer header order: `Patient Name · Cat or Dog · Breed · Age · Weight kg ·
 
 - Top strip: "V-Seg Engine v1.0"
 - Sidebar, above all controls: "A neural network bone segmentation engine is in training at Vimics HQ, will be available at no charge, on vimics.vet/segmentation."
-- Footer: "Not suitable for surgical planning or 3D printing, which require human inspection with validated medical software. © 2026 Vimics"
+- Footer: "Not suitable for surgical planning or 3D printing, which require human inspection with local masking on medical software. © 2026 Vimics"
 
 ## Pipeline
 
@@ -58,7 +58,7 @@ Abuse controls on the public endpoint: origin allow-list, size cap, per-address 
 
 ## Clinical accuracy rules
 
-- Every scan is capped to −1024 to 4000 HU and opens at 226 to 1988 HU. Both ends of the selector move. There are no presets, no normalization and no per-scan adjustment. A note under the selector explains why values can shift.
+- Every scan is capped to −1024 to 4000 HU and opens at 300 to 1900 HU. Both ends of the selector move. There are no presets, no normalization and no per-scan adjustment. A note under the selector explains why values can shift.
 - The cube and Section Analysis controls use plain X, Y and Z axes, so the screen makes no left or right claim. Handedness has its own test.
 - Series with irregular spacing, missing slices or thick slices show a warning. Missing position data stops the load with a clear message.
 - Series flagged as having burned-in annotations are not uploaded.

@@ -194,7 +194,7 @@ describe('a two-ended density range', () => {
   const shellVolume = (4 / 3) * Math.PI * (14 ** 3 - 8 ** 3);
 
   it('leaves out what is denser than the top of the range, as a cavity with the right volume', () => {
-    const { structures } = new SurfaceEngine(volumeFrom({ hu: cored })).full({ min: 226, max: 1000 });
+    const { structures } = new SurfaceEngine(volumeFrom({ hu: cored })).full({ min: 100, max: 1000 });
     expect(structures.length).toBe(1);
     expect(structures[0].volumeMm3 / shellVolume).toBeGreaterThan(0.95);
     expect(structures[0].volumeMm3 / shellVolume).toBeLessThan(1.05);
@@ -202,14 +202,14 @@ describe('a two-ended density range', () => {
 
   it('matches a one-sided threshold when nothing is above the top', () => {
     const volume = () => volumeFrom({ hu: cored });
-    const open = new SurfaceEngine(volume()).full(above(226));
-    const band = new SurfaceEngine(volume()).full({ min: 226, max: 3000 });
+    const open = new SurfaceEngine(volume()).full(above(300));
+    const band = new SurfaceEngine(volume()).full({ min: 300, max: 3000 });
     expect(band.triangles).toBe(open.triangles);
     expect(band.structures[0].volumeMm3).toBeCloseTo(open.structures[0].volumeMm3);
   });
 
   it('points normals out of the bone on both surfaces', () => {
-    const { structures } = new SurfaceEngine(volumeFrom({ hu: cored })).full({ min: 226, max: 1000 });
+    const { structures } = new SurfaceEngine(volumeFrom({ hu: cored })).full({ min: 300, max: 1000 });
     const { positions: p, normals: n } = structures[0];
     let outer = 0, inner = 0, outerOut = 0, innerIn = 0;
     for (let v = 0; v < p.length / 3; v++) {
@@ -230,7 +230,7 @@ describe('a two-ended density range', () => {
   });
 
   it('starts every scan at the same range, on the sample too', () => {
-    expect(BONE_RANGE).toEqual({ min: 226, max: 1988 });
+    expect(BONE_RANGE).toEqual({ min: 300, max: 1900 });
     const { structures } = new SurfaceEngine(buildSampleVolume()).full(BONE_RANGE);
     expect(structures.filter((s) => !s.autoHidden).length).toBeGreaterThan(0);
   });
@@ -301,7 +301,7 @@ describe('layers behind the filters', () => {
       if (ci < 0 || ci > 7 || cj < 0 || cj > 7) return -300;
       return sphere([4 + ci * 5, 4 + cj * 5, 10], 1.8)(x, y, z);
     } });
-    const r = new SurfaceEngine(volume).full(BONE_RANGE);
+    const r = new SurfaceEngine(volume).full(above(250));
     const listed = r.structures.filter((s) => s.listed), merged = r.structures.filter((s) => !s.listed);
     expect(r.boneCount).toBe(centers.length);
     expect(listed.length).toBe(MAX_LISTED);

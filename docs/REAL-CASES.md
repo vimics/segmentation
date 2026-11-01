@@ -19,7 +19,7 @@ Four veterinary CT cases, run exactly as received on 2026-10-31. Labels only: th
 | A description or image type states the plane | "SAG" means *right* in Turkish on an axial series, and Siemens marks sagittal reformats `AXIAL` | Plane comes from the slice orientation |
 | A change of acquisition number means a new volume | One 289-slice volume carries 4 acquisition numbers | Split a series only when positions repeat |
 | The smaller series has lower resolution | Reformats often have smaller pixels (0.18 to 0.24 mm against 0.48 mm), though their source isn't recorded | The most slices always opens, and there is no choice of series |
-| One range fits every scan's bone | Sharp filters overshoot, and the cone-beam scan has soft tissue near 1,120 | Every scan opens at 226 to 1988 HU, and the vet moves both ends |
+| One range fits every scan's bone | Sharp filters overshoot, and the cone-beam scan has soft tissue near 1,120 | Every scan opens at 300 to 1900 HU, and the vet moves both ends |
 | The table is one long shell | At higher thresholds it breaks up, and tubing looks similar | Pieces under 0.5 mm mean thickness join the table under the Thin fragments filter |
 
 ## Series chosen
@@ -44,17 +44,17 @@ The same threshold on the same anatomy, Cat 1:
 
 ## Threshold selector
 
-Every scan is capped to −1024 to 4000 HU when decoded, and opens at 226 to 1988 HU. Nothing is adjusted per scan: no presets, no normalization and no choice based on the filter. An earlier version did all three, tuned by judging renders, which cannot happen on a vet's computer.
+Every scan is capped to −1024 to 4000 HU when decoded, and opens at 300 to 1900 HU. Nothing is adjusted per scan: no presets, no normalization and no choice based on the filter. An earlier version did all three, tuned by judging renders, which cannot happen on a vet's computer.
 
 Both ends move. A surface forms at the lower limit against thinner tissue and at the upper limit against denser material.
 
 What the default gives on these cases:
 
-| Case | At 226 to 1988 HU | What the vet does |
+| Case | At 300 to 1900 HU | What the vet does |
 |---|---|---|
-| Dog 1 | Clean bones, table hidden | Nothing |
+| Dog 1 | Clean bones, table hidden apart from one small flat sliver | Nothing, or hide the sliver |
 | Dog 2 | Clean bones | Nothing, or raise the lower limit to clear specks |
-| Cat 1 | Bones plus thin shells over the body, from a sharp filter | Raise the lower limit to about 500 |
+| Cat 1 | Bones with a few rough patches on thin bone, from a sharp filter | Nothing, or raise the lower limit to clear them |
 | Cat 2 | Whole body and table, with bone hidden inside | Raise the upper limit first, then set the lower limit: 2000 to 4000 shows the skeleton |
 
 Measured densities, every voxel of the series each case opens with:
@@ -74,16 +74,18 @@ Two filters sit under the threshold, both on by default. Small shells are pieces
 
 Small shells are built only when the vet turns that filter off, so the default costs nothing extra. They then share one mesh, so one draw call however many there are. They get 2M triangles of room above the 6M budget: without it, Dog 2 coarsened from 0.4 to 0.8 mm as a whole when shells were turned on.
 
-Triangles at 226 to 1988 HU:
+Triangles at 300 to 1900 HU:
 
 | Case | Small shells | Thin fragments | Both filters on | Shells off | Both off |
 |---|---|---|---|---|---|
-| Cat 1 | 51,962 | 43 | 1.94M | 3.05M | 4.09M |
-| Cat 2 | 1,390 | 15 | 2.38M | 2.44M | 2.49M |
-| Dog 1 | 1,969 | 11 | 1.35M | 1.44M | 5.27M |
-| Dog 2 | 41,221 | 34 | 5.02M | 5.69M | 6.09M |
+| Cat 1 | 17,162 | 22 | 1.39M | 1.75M | 2.63M |
+| Cat 2 | 1,039 | 11 | 2.21M | 2.25M | 2.28M |
+| Dog 1 | 442 | 4 | 1.47M | 1.48M | 5.78M |
+| Dog 2 | 6,572 | 5 | 5.11M | 5.24M | 5.25M |
 
-The rebuild took about 1 to 2.5 s. With both filters off and the lower limit at −400 HU, the largest result was 6.2M triangles and browser memory stayed under 3 GB.
+Turning shells off took up to about 4.5 s. With both filters off and the lower limit at −400 HU, the largest result was 6.3M triangles and browser memory stayed under 3 GB.
+
+Raising the default from 226 to 300 HU made the largest piece of each case smaller, as a higher lower limit should: Cat 1 46.6 to 35.9 cm³, Cat 2 1,551 to 1,519 cm³, Dog 1 86.9 to 75.5 cm³. On Dog 2 the largest piece (386.6 cm³) split into two (198.8 and 146.3 cm³), so more pieces are listed.
 
 ## Timing and memory
 
@@ -95,6 +97,8 @@ Measured on this Mac in a real browser with software graphics, from pressing Bui
 | Cat 2 | 5.8 s | | | |
 | Dog 1 | 3.2 s | 23 s | 2.1 GB | 193 MB |
 | Dog 2 | 3.7 s | 30 s | 2.3 GB | 304 MB |
+
+These were measured at the earlier default of 226 to 1988 HU. At 300 to 1900 HU the first model took 3.2 to 5.9 s.
 
 ## De-identification on the real files
 

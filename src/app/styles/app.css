@@ -189,7 +189,7 @@ input[type="checkbox"]:checked::before { background: var(--vurgu-anlamli); }
 .iyilestir { position: absolute; left: 50%; top: var(--b3); transform: translateX(-50%); display: grid; gap: var(--b1); width: 240px; padding: var(--b2) var(--b3); background: var(--zemin); border: 1px solid var(--kenarlik); border-radius: var(--r2); font-size: 13px; }
 
 /* Footer */
-.alt { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 2px var(--b4); min-height: 32px; padding: var(--b1) var(--b4); background: var(--zemin); border-top: 1px solid var(--ayrac); font: 400 12px/1.4 var(--mono); color: var(--metin-ikincil); }
+.alt { display: grid; grid-template-columns: minmax(110px, 1fr) minmax(0, auto) minmax(110px, 1fr); align-items: center; gap: 2px var(--b4); min-height: 32px; padding: var(--b1) var(--b4); background: var(--zemin); border-top: 1px solid var(--ayrac); font: 400 12px/1.4 var(--mono); color: var(--metin-ikincil); }
 .alt-orta { grid-column: 2; font-weight: 500; color: var(--metin-birincil); text-align: center; }
 .alt-sag { grid-column: 3; justify-self: end; white-space: nowrap; }
 

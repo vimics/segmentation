@@ -35,7 +35,7 @@ Real-case checks need `REAL_OUT` set to a folder outside the repo. See the end o
 These are decided. Don't change them without being asked:
 
 - **Series:** always the most slices. A tie prefers a reconstruction, then a bone filter, then no contrast, then the first read. The vet gets no choice of series.
-- **Threshold:** every scan is capped to −1024 to 4000 HU and opens at 226 to 1988 HU. Both ends move. No presets, no normalization, nothing chosen per scan.
+- **Threshold:** every scan is capped to −1024 to 4000 HU and opens at 300 to 1900 HU. Both ends move. No presets, no normalization, nothing chosen per scan.
 - **Filters:** Small shells (under 8 mm³) and Thin fragments (under 0.5 mm mean thickness, table included), both on by default. Small shells are built only when that filter is turned off.
 - **Axes:** X, Y and Z only. The screen makes no left or right claim.
 

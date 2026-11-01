@@ -131,17 +131,17 @@
       <div class="bolme-bas">
         <p class="etiket">Threshold</p>
         <div class="deger">
-          <input id="esik-sayi-min" type="number" min="-1024" max="4000" step="1" value="226" aria-label="Lowest density, in Hounsfield units">
+          <input id="esik-sayi-min" type="number" min="-1024" max="4000" step="1" value="300" aria-label="Lowest density, in Hounsfield units">
           <span class="ayrac">–</span>
-          <input id="esik-sayi-max" type="number" min="-1024" max="4000" step="1" value="1988" aria-label="Highest density, in Hounsfield units">
+          <input id="esik-sayi-max" type="number" min="-1024" max="4000" step="1" value="1900" aria-label="Highest density, in Hounsfield units">
           <span>HU</span>
         </div>
       </div>
       <div class="aralik" id="aralik">
-        <input id="esik-min" type="range" min="-1024" max="4000" step="1" value="226" aria-label="Lowest density">
-        <input id="esik-max" type="range" min="-1024" max="4000" step="1" value="1988" aria-label="Highest density">
+        <input id="esik-min" type="range" min="-1024" max="4000" step="1" value="300" aria-label="Lowest density">
+        <input id="esik-max" type="range" min="-1024" max="4000" step="1" value="1900" aria-label="Highest density">
       </div>
-      <p class="esik-not" id="esik-not">We normally expect cortical and cancellous bones between 226 - 1988 Hounsfield units, but shifts can occur due to the calibration, tube voltage and reconstruction filters. Use threshold slider to adjust for shifts and eliminate noise.</p>
+      <p class="esik-not" id="esik-not">We normally expect cortical and cancellous bones between 300 - 1900 Hounsfield units, but shifts can occur due to the calibration, tube voltage and reconstruction filters. Use threshold slider to adjust for shifts and eliminate noise.</p>
     </section>
 
     <section class="bolme" id="filtreler">
@@ -250,7 +250,7 @@
 </main>
 
 <footer class="alt">
-  <strong class="alt-orta">Not suitable for surgical planning or 3D printing, which require human inspection with validated medical software.</strong>
+  <strong class="alt-orta">Not suitable for surgical planning or 3D printing, which require human inspection with local masking on medical software.</strong>
   <span class="alt-sag">© 2026 Vimics</span>
 </footer>
 
