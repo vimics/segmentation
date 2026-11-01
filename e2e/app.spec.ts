@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 import { unzipSync, zipSync } from 'fflate';
 import { createRequire } from 'node:module';
 import { PLANTED, spherePhantom, writeSlice, type SliceSpec, type Syntax } from '../test/phantom';
@@ -637,6 +638,50 @@ test.describe('rotating the view', () => {
     await page.click('#sigdir');
     await settle(page);
     expect(near(await cube(page), opening)).toBe(true);
+  });
+
+  test('a snapshot carries the measurements on screen, and leaves out ones clipped away', async ({ page }) => {
+    await sample(page);
+    /** How many pixels of a downloaded snapshot are exactly the measurement colour. */
+    const accentPixels = async () => {
+      const [download] = await Promise.all([page.waitForEvent('download'), page.click('#goruntu')]);
+      const png = readFileSync(await download.path()).toString('base64');
+      return page.evaluate(async (data) => {
+        const img = new Image();
+        img.src = `data:image/png;base64,${data}`;
+        await img.decode();
+        const c = document.createElement('canvas');
+        c.width = img.width;
+        c.height = img.height;
+        const g = c.getContext('2d')!;
+        g.drawImage(img, 0, 0);
+        const d = g.getImageData(0, 0, c.width, c.height).data;
+        let n = 0;
+        for (let i = 0; i < d.length; i += 4) if (d[i] === 0x1F && d[i + 1] === 0x7A && d[i + 2] === 0x54) n++;
+        return n;
+      }, png);
+    };
+    expect(await accentPixels()).toBe(0);
+
+    const { x, y } = await center(page);
+    await page.click('[data-arac="distance"]');
+    await page.mouse.click(x - 20, y);
+    await page.mouse.click(x + 20, y);
+    await expect(page.locator('.etiket-olcu')).toHaveCount(1);
+    await page.keyboard.press('Escape');
+    await page.evaluate(() => {
+      const drawn: string[] = [];
+      (window as unknown as { drawn: string[] }).drawn = drawn;
+      const original = CanvasRenderingContext2D.prototype.fillText;
+      CanvasRenderingContext2D.prototype.fillText = function (text: string, x: number, y: number) { drawn.push(text); original.call(this, text, x, y); };
+    });
+    expect(await accentPixels()).toBeGreaterThan(50);
+    const shown = (await page.locator('.etiket-olcu').textContent())!;
+    expect(await page.evaluate(() => (window as unknown as { drawn: string[] }).drawn)).toContain(shown);
+
+    await page.locator('#kesitler input[type=checkbox][data-eksen="0"]').check();
+    await expect(page.locator('.etiket-olcu')).toHaveCount(0);
+    expect(await accentPixels()).toBe(0);
   });
 
   test('panning follows the pointer exactly, and zoom still works', async ({ page }) => {

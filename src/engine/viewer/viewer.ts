@@ -516,6 +516,18 @@ export class Viewer {
     return this.el.host.clientHeight / ((this.camera.top - this.camera.bottom) / this.camera.zoom);
   }
 
+  /** What the overlay and a snapshot both show, in host pixels. */
+  private measurementsInView() {
+    return this.measurements
+      // A measurement on bone that is clipped away leaves the view but stays in the panel.
+      .filter((m) => !m.points.some((p) => this.planes.some((pl, i) => this.clipOn[i] && pl.distanceToPoint(p) < -0.5)))
+      .map((m) => {
+        const pts = m.points.map((p) => this.project(p));
+        const at = m.kind === 'distance' ? [(pts[0][0] + pts[1][0]) / 2, (pts[0][1] + pts[1][1]) / 2 - 16] : [pts[1][0], pts[1][1] + 20];
+        return { pts, at, text: `${m.id} ${m.value}` };
+      });
+  }
+
   private drawOverlay() {
     const { overlay, labels } = this.el;
     overlay.replaceChildren();
@@ -523,18 +535,14 @@ export class Viewer {
     const line = (a: number[], b: number[], cls?: string) => this.svg('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], ...(cls ? { class: cls } : {}) });
     const dot = (p: number[]) => this.svg('circle', { cx: p[0], cy: p[1], r: 3.5 });
 
-    for (const m of this.measurements) {
-      // A measurement on bone that is clipped away leaves the view but stays in the panel.
-      if (m.points.some((p) => this.planes.some((pl, i) => this.clipOn[i] && pl.distanceToPoint(p) < -0.5))) continue;
-      const pts = m.points.map((p) => this.project(p));
+    for (const { pts, at, text } of this.measurementsInView()) {
       for (let i = 0; i + 1 < pts.length; i++) line(pts[i], pts[i + 1]);
       pts.forEach(dot);
-      const at = m.kind === 'distance' ? [(pts[0][0] + pts[1][0]) / 2, (pts[0][1] + pts[1][1]) / 2 - 16] : [pts[1][0], pts[1][1] + 20];
       const label = document.createElement('div');
       label.className = 'etiket-olcu';
       label.style.left = `${at[0]}px`;
       label.style.top = `${at[1]}px`;
-      label.textContent = `${m.id}  ${m.value}`;
+      label.textContent = text;
       labels.appendChild(label);
     }
     const draft = this.draft.map((p) => this.project(p));
@@ -567,7 +575,43 @@ export class Viewer {
     this.el.overlay.appendChild(n);
   }
 
-  /** The model, a scale bar and the Vimics mark. Never any patient or owner details. */
+  /** Draws the measurements onto a snapshot the way the overlay and its CSS show them on screen. */
+  private paintMeasurements(ctx: CanvasRenderingContext2D, ratio: number) {
+    const css = getComputedStyle(this.el.host), color = (name: string) => css.getPropertyValue(name).trim();
+    const accent = color('--vurgu-anlamli'), surface = color('--zemin'), inView = this.measurementsInView();
+    ctx.save();
+    ctx.strokeStyle = accent;
+    ctx.fillStyle = surface;
+    ctx.lineWidth = 1.5 * ratio;
+    for (const { pts } of inView) {
+      ctx.beginPath();
+      pts.forEach(([px, py], i) => (i ? ctx.lineTo(px * ratio, py * ratio) : ctx.moveTo(px * ratio, py * ratio)));
+      ctx.stroke();
+      for (const [px, py] of pts) {
+        ctx.beginPath();
+        ctx.arc(px * ratio, py * ratio, 3.5 * ratio, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+    ctx.font = `500 ${12 * ratio}px "IBM Plex Mono", monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineWidth = ratio;
+    for (const { at, text } of inView) {
+      const lw = ctx.measureText(text).width + 14 * ratio, lh = 22 * ratio, lx = at[0] * ratio, ly = at[1] * ratio;
+      ctx.beginPath();
+      ctx.roundRect(lx - lw / 2, ly - lh / 2, lw, lh, 4 * ratio);
+      ctx.fillStyle = surface;
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = color('--metin-birincil');
+      ctx.fillText(text, lx, ly);
+    }
+    ctx.restore();
+  }
+
+  /** The model, its measurements, a scale bar, the case line and the Vimics mark. */
   async snapshot(background: string, ink: string, logoMarkup: string, caption: string, dark = false): Promise<Blob> {
     this.render();
     const canvas = this.el.canvas, w = canvas.width, h = canvas.height, ratio = this.renderer.getPixelRatio();
@@ -578,6 +622,7 @@ export class Viewer {
     ctx.fillStyle = background;
     ctx.fillRect(0, 0, w, h);
     ctx.drawImage(canvas, 0, 0);
+    this.paintMeasurements(ctx, ratio);
 
     /** Frosted ice behind the labels, so they stay readable over the model. Blurs by rescaling, since Safari lacks canvas filters. */
     const frost = (px: number, py: number, pw: number, ph: number) => {
