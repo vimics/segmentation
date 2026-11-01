@@ -109,7 +109,7 @@ test.describe('viewer', () => {
     await expect(page.locator('#yapilar li')).toHaveCount(1);
     await expect(page.locator('.yakinda')).toContainText('A neural network bone segmentation engine is in training at Vimics HQ, will be available at vimics.vet/segmentation, at no charge.');
     await expect(page.locator('.urun-ad')).toHaveText('V-Seg Engine v1.0');
-    await expect(page.locator('.ray .etiket:visible')).toHaveText(['Coming soon', 'Threshold', 'Filters', 'Measure', 'Clip', 'Case storage', 'Structures']);
+    await expect(page.locator('.ray .etiket:visible')).toHaveText(['Coming soon', 'Threshold', 'Filters', 'Measure', 'Section Analysis', 'Case storage', 'Structures']);
     await expect(page.locator('.ray > *').first()).toHaveClass('yakinda');
     await expect(page.locator('.kup button').first()).toHaveText('Z');
     await expect(page.locator('body')).not.toContainText('Verify left and right');
@@ -521,6 +521,173 @@ test.describe('filters and structures', () => {
     await expect(page.locator('#uyarilar')).toContainText('1 slice is missing');
     await expect(page.locator('#seri-etiket')).toBeHidden();
     await expect(page.locator('#seri')).toBeHidden();
+  });
+});
+
+test.describe('rotating the view', () => {
+  /** The cube's rotation, which follows the camera: the 16 numbers of its CSS matrix. */
+  const cube = (page: Page) => page.locator('#kup').evaluate((el) => (el as HTMLElement).style.transform.match(/-?[\d.e-]+/g)!.slice(1).map(Number));
+  const near = (a: number[], b: number[]) => a.every((v, i) => Math.abs(v - b[i]) < 1e-3);
+  const settle = (page: Page) => page.waitForTimeout(650);
+  const sample = async (page: Page) => { await page.goto('/'); await page.click('#ornek'); await waitForModel(page); await settle(page); };
+  const center = async (page: Page) => { const b = (await page.locator('#tuval').boundingBox())!; return { x: b.x + b.width / 2, y: b.y + b.height / 2, b }; };
+  const drag = async (page: Page, dx: number, dy: number, button: 'left' | 'right' = 'left') => {
+    const { x, y } = await center(page);
+    await page.mouse.move(x, y);
+    await page.mouse.down({ button });
+    await page.mouse.move(x + dx, y + dy, { steps: 8 });
+    await page.mouse.up({ button });
+    await page.waitForTimeout(120);
+  };
+
+  test('has no stop going over the top, and keeps going sideways', async ({ page }) => {
+    await sample(page);
+    // A turntable can't turn the view upside down. Element 5 of the matrix is the cosine that goes negative when it does.
+    const seen: number[] = [];
+    for (let n = 0; n < 8; n++) {
+      await drag(page, 0, 120);
+      seen.push((await cube(page))[5]);
+    }
+    expect(Math.min(...seen)).toBeLessThan(-0.5);
+    expect(Math.max(...seen)).toBeGreaterThan(0.2);
+
+    const before = await cube(page);
+    await drag(page, 150, 0);
+    expect(near(await cube(page), before)).toBe(false);
+  });
+
+  test('the arrows appear only at a face, and vanish after a drag', async ({ page }) => {
+    await sample(page);
+    await expect(page.locator('[data-cevir]').first()).toBeHidden();
+    await page.locator('#kup [data-yuz="z"]').click({ force: true });
+    await settle(page);
+    await expect(page.locator('[data-cevir="saat"]')).toBeVisible();
+    await expect(page.locator('[data-cevir="ters"]')).toBeVisible();
+    await drag(page, 120, 40);
+    await expect(page.locator('[data-cevir="saat"]')).toBeHidden();
+  });
+
+  test('each arrow turns exactly 90°, and the steps add up', async ({ page }) => {
+    await sample(page);
+    await page.locator('#kup [data-yuz="z"]').click({ force: true });
+    await settle(page);
+    const start = await cube(page);
+
+    await page.click('[data-cevir="saat"]');
+    await settle(page);
+    const turned = await cube(page);
+    expect(near(turned, start)).toBe(false);
+    // A quarter turn swaps the axes on screen exactly: each entry of the rotation is 0 or ±1.
+    expect(turned.slice(0, 12).every((v) => Math.abs(Math.abs(v) - Math.round(Math.abs(v))) < 1e-3)).toBe(true);
+
+    await page.click('[data-cevir="ters"]');
+    await settle(page);
+    expect(near(await cube(page), start)).toBe(true);
+
+    for (let n = 0; n < 4; n++) { await page.click('[data-cevir="saat"]'); await settle(page); }
+    expect(near(await cube(page), start)).toBe(true);
+
+    // Two quick clicks land on a half turn, not somewhere in between.
+    await page.click('[data-cevir="saat"]');
+    await page.click('[data-cevir="saat"]');
+    await settle(page);
+    await page.click('[data-cevir="ters"]');
+    await page.click('[data-cevir="ters"]');
+    await settle(page);
+    expect(near(await cube(page), start)).toBe(true);
+  });
+
+  test('a face click squares up a rolled view, and fit returns to the opening angle', async ({ page }) => {
+    await sample(page);
+    const opening = await cube(page);
+    await drag(page, 90, 170);
+    await page.locator('#kup [data-yuz="z"]').click({ force: true });
+    await settle(page);
+    const squared = await cube(page);
+    expect(squared.slice(0, 12).every((v) => Math.abs(Math.abs(v) - Math.round(Math.abs(v))) < 1e-3)).toBe(true);
+    await page.click('#sigdir');
+    await settle(page);
+    expect(near(await cube(page), opening)).toBe(true);
+  });
+
+  test('panning follows the pointer exactly, and zoom still works', async ({ page }) => {
+    await sample(page);
+    await page.click('[data-arac="distance"]');
+    const { x, y } = await center(page);
+    await page.mouse.click(x, y);
+    await page.keyboard.press('Escape');
+    const dot = page.locator('#katman circle').first();
+    await expect(dot).toHaveCount(1);
+    const at = async () => [+(await dot.getAttribute('cx'))!, +(await dot.getAttribute('cy'))!];
+
+    // A second point finishes the measurement, so its dots stay on screen.
+    await page.click('[data-arac="distance"]');
+    await page.mouse.click(x, y);
+    await page.mouse.click(x + 30, y + 10);
+    await page.keyboard.press('Escape');
+    const first = await at();
+    await drag(page, 100, -60, 'right');
+    const moved = await at();
+    expect(Math.abs(moved[0] - first[0] - 100)).toBeLessThan(3);
+    expect(Math.abs(moved[1] - first[1] + 60)).toBeLessThan(3);
+
+    const scale = () => page.locator('#olcek-yazi').textContent();
+    const barWidth = () => page.locator('#olcek-cizgi').evaluate((el) => (el as HTMLElement).getBoundingClientRect().width);
+    const before = `${await scale()} ${await barWidth()}`;
+    await page.mouse.move(x, y);
+    await page.mouse.wheel(0, -600);
+    await expect.poll(async () => `${await scale()} ${await barWidth()}`).not.toBe(before);
+  });
+
+  test('an idle page draws nothing', async ({ page }) => {
+    await sample(page);
+    await page.locator('#kup [data-yuz="x"]').click({ force: true });
+    await settle(page);
+    await page.evaluate(() => {
+      const gl = (document.getElementById('tuval') as HTMLCanvasElement).getContext('webgl2')!;
+      const draw = gl.drawElements.bind(gl);
+      const w = window as unknown as { draws: number };
+      w.draws = 0;
+      gl.drawElements = (...args: Parameters<typeof draw>) => { w.draws++; draw(...args); };
+    });
+    const draws = () => page.evaluate(() => (window as unknown as { draws: number }).draws);
+    await page.waitForTimeout(800);
+    expect(await draws()).toBe(0);
+    // The same counter does see a drag, so the zero above means something.
+    await drag(page, 60, 0);
+    expect(await draws()).toBeGreaterThan(0);
+    const after = await draws();
+    await page.waitForTimeout(800);
+    expect(await draws()).toBe(after);
+  });
+
+  test('measuring, click-to-hide and sections still work after going over the top and rolling', async ({ page }) => {
+    await sample(page);
+    const problems = collectProblems(page);
+    for (let n = 0; n < 5; n++) await drag(page, 0, 120);
+    await page.locator('#kup [data-yuz="y"]').click({ force: true });
+    await settle(page);
+    await page.click('[data-cevir="saat"]');
+    await settle(page);
+
+    const { x, y } = await center(page);
+    await page.click('[data-arac="distance"]');
+    await page.mouse.click(x - 20, y);
+    await page.mouse.click(x + 20, y);
+    await expect(page.locator('#olculer li')).toHaveCount(1);
+    await page.keyboard.press('Escape');
+
+    await page.locator('#kesitler input[type=checkbox][data-eksen="1"]').check();
+    await expect(page.locator('#kesitler input[type=range][data-eksen="1"]')).toBeEnabled();
+    await page.locator('#kesitler input[type=checkbox][data-eksen="1"]').uncheck();
+
+    await page.mouse.click(x, y);
+    await expect(page.locator('#aksiyon')).toBeVisible();
+    await page.click('#aksiyon-gizle');
+    await page.locator('#yapilar-bolme summary').scrollIntoViewIfNeeded();
+    await page.click('#yapilar-bolme summary');
+    await expect(page.locator('#yapilar input:not(:checked)')).toHaveCount(1);
+    expect(problems).toEqual([]);
   });
 });
 

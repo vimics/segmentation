@@ -146,9 +146,15 @@ input[type="checkbox"]:checked::before { background: var(--vurgu-anlamli); }
 .ozet { font: 400 12px/1.5 var(--mono); color: var(--metin-ikincil); max-width: 76ch; }
 .ozet b { font-weight: 500; color: var(--metin-birincil); }
 
-.kup-kap { position: absolute; right: var(--b4); bottom: var(--b4); width: 64px; height: 64px; perspective: none; }
-.kup { position: absolute; left: 12px; top: 12px; width: 40px; height: 40px; transform-style: preserve-3d; }
-.kup button { position: absolute; inset: 0; display: grid; place-items: center; padding: 0; background: var(--zemin); border: 1px solid var(--kenarlik-kontrol); font: 500 12px/1 var(--mono); color: var(--baslik); cursor: pointer; backface-visibility: hidden; }
+.kup-kap { position: absolute; right: var(--b4); bottom: var(--b4); width: 74px; height: 74px; perspective: none; }
+.kup { position: absolute; left: 14px; top: 14px; width: 46px; height: 46px; transform-style: preserve-3d; }
+/* The two quarter-turn arrows, both at the cube's top right corner. */
+.kup-cevir { position: absolute; width: 18px; height: 18px; padding: 0; background: none; border: 0; color: var(--metin-ikincil); cursor: pointer; }
+.kup-cevir:hover { color: var(--vurgu-anlamli); }
+.kup-cevir svg { display: block; width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.kup-cevir.solda { top: -6px; right: 12px; }
+.kup-cevir.sagda { top: 10px; right: -6px; }
+.kup button { position: absolute; inset: 0; display: grid; place-items: center; padding: 0; background: var(--zemin); border: 1px solid var(--kenarlik-kontrol); font: 500 13px/1 var(--mono); color: var(--baslik); cursor: pointer; backface-visibility: hidden; }
 .kup button:hover { background: var(--zemin-yukseltilmis); color: var(--vurgu-anlamli); }
 
 .aksiyon { position: absolute; transform: translate(10px, -50%); display: flex; align-items: center; gap: var(--b2); padding: var(--b1) var(--b1) var(--b1) var(--b3); background: var(--zemin); border: 1px solid var(--kenarlik-kontrol); border-radius: var(--r2); font-size: 13px; white-space: nowrap; }

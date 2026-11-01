@@ -159,6 +159,7 @@ function ensureViewer(): Viewer {
     onMeasurementsChanged: renderMeasurements,
     onToolChanged: renderTool,
     onStructureClicked: showStructureAction,
+    onFaceOnChanged: (on) => { document.querySelectorAll<HTMLElement>('[data-cevir]').forEach((b) => { b.hidden = !on; }); },
     onCameraMoved: () => { $('aksiyon').hidden = true; },
   });
   return viewer;
@@ -443,6 +444,7 @@ window.addEventListener('keydown', (e) => {
   $('aksiyon').hidden = true;
 });
 document.querySelectorAll<HTMLButtonElement>('#kup button').forEach((b) => b.addEventListener('click', () => viewer?.viewFrom(b.dataset.yuz ?? 'z')));
+document.querySelectorAll<HTMLButtonElement>('[data-cevir]').forEach((b) => b.addEventListener('click', () => viewer?.rollView(b.dataset.cevir === 'saat' ? 1 : -1)));
 $('sigdir').addEventListener('click', () => viewer?.fit());
 
 $('goruntu').addEventListener('click', async () => {

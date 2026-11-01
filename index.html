@@ -168,11 +168,11 @@
     </section>
 
     <section class="bolme">
-      <p class="etiket">Clip</p>
+      <p class="etiket">Section Analysis</p>
       <div id="kesitler">
-        <label class="kesit"><input type="checkbox" data-eksen="0" aria-label="Clip along X"><span>X</span><input type="range" data-eksen="0" step="0.5" disabled aria-label="X position"></label>
-        <label class="kesit"><input type="checkbox" data-eksen="1" aria-label="Clip along Y"><span>Y</span><input type="range" data-eksen="1" step="0.5" disabled aria-label="Y position"></label>
-        <label class="kesit"><input type="checkbox" data-eksen="2" aria-label="Clip along Z"><span>Z</span><input type="range" data-eksen="2" step="0.5" disabled aria-label="Z position"></label>
+        <label class="kesit"><input type="checkbox" data-eksen="0" aria-label="Section along X"><span>X</span><input type="range" data-eksen="0" step="0.5" disabled aria-label="X position"></label>
+        <label class="kesit"><input type="checkbox" data-eksen="1" aria-label="Section along Y"><span>Y</span><input type="range" data-eksen="1" step="0.5" disabled aria-label="Y position"></label>
+        <label class="kesit"><input type="checkbox" data-eksen="2" aria-label="Section along Z"><span>Z</span><input type="range" data-eksen="2" step="0.5" disabled aria-label="Z position"></label>
       </div>
     </section>
 
@@ -211,13 +211,15 @@
       <p class="ozet" id="ozet"></p>
     </div>
     <div class="kup-kap">
+      <button class="kup-cevir solda" type="button" data-cevir="ters" aria-label="Rotate view 90° anticlockwise" title="Rotate 90° anticlockwise" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 9.5A7 7 0 0 0 5 3.2"/><path d="M7.6 0.9 4.6 3 6.5 6"/></svg></button>
+      <button class="kup-cevir sagda" type="button" data-cevir="saat" aria-label="Rotate view 90° clockwise" title="Rotate 90° clockwise" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 2.5A7 7 0 0 1 12.8 11"/><path d="M15.1 8.4 13 11.4 10 9.5"/></svg></button>
       <div class="kup" id="kup">
-        <button data-yuz="z" style="transform: translateZ(20px)" aria-label="View along Z">Z</button>
-        <button data-yuz="-z" style="transform: rotateY(180deg) translateZ(20px)" aria-label="View along minus Z">−Z</button>
-        <button data-yuz="x" style="transform: rotateY(90deg) translateZ(20px)" aria-label="View along X">X</button>
-        <button data-yuz="-x" style="transform: rotateY(-90deg) translateZ(20px)" aria-label="View along minus X">−X</button>
-        <button data-yuz="y" style="transform: rotateX(90deg) translateZ(20px)" aria-label="View along Y">Y</button>
-        <button data-yuz="-y" style="transform: rotateX(-90deg) translateZ(20px)" aria-label="View along minus Y">−Y</button>
+        <button data-yuz="z" style="transform: translateZ(23px)" aria-label="View along Z">Z</button>
+        <button data-yuz="-z" style="transform: rotateY(180deg) translateZ(23px)" aria-label="View along minus Z">−Z</button>
+        <button data-yuz="x" style="transform: rotateY(90deg) translateZ(23px)" aria-label="View along X">X</button>
+        <button data-yuz="-x" style="transform: rotateY(-90deg) translateZ(23px)" aria-label="View along minus X">−X</button>
+        <button data-yuz="y" style="transform: rotateX(90deg) translateZ(23px)" aria-label="View along Y">Y</button>
+        <button data-yuz="-y" style="transform: rotateX(-90deg) translateZ(23px)" aria-label="View along minus Y">−Y</button>
       </div>
     </div>
     <div class="aksiyon" id="aksiyon" hidden><span id="aksiyon-yazi"></span><button type="button" id="aksiyon-gizle">Hide</button></div>

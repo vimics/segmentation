@@ -38,8 +38,9 @@ Viewer header order: `Patient Name · Cat or Dog · Breed · Age · Weight kg ·
 4. **Build the volume:** sort slices along the slice normal. Vertices use each slice's own position, so uneven spacing and gantry tilt stay correct in true millimetres. No resampling.
 5. **Extract the surface:** marching cubes. Half-resolution preview first, then full. A triangle budget chooses the level, and the footer states the mesh resolution.
 6. **Clean up:** connected components on the mesh, with internal cavities attached to their parent. Two filters, both on by default: Small shells (under 8 mm³, built only when turned off) and Thin fragments (under 0.5 mm mean thickness, plus the table). The largest 50 pieces are listed under a collapsed Structures dropdown, where a piece hidden by clicking comes back.
-7. **Render:** orthographic camera, so the scale bar is true at any depth. Ivory material with occlusion baked into vertices from the volume.
-8. **Pick:** GPU position buffer, the same cost at any triangle count and correct under clipping.
+7. **Navigate:** free rotation with no stops, since a CT has no natural up. Cube faces square up the view, two arrows turn a face-on view by exact 90° steps, and fit returns to the opening angle.
+8. **Render:** orthographic camera, so the scale bar is true at any depth. Ivory material with occlusion baked into vertices from the volume.
+9. **Pick:** GPU position buffer, the same cost at any triangle count and correct under clipping.
 
 ## Upload path
 
@@ -58,7 +59,7 @@ Abuse controls on the public endpoint: origin allow-list, size cap, per-address 
 ## Clinical accuracy rules
 
 - Every scan is capped to −1024 to 4000 HU and opens at 226 to 1988 HU. Both ends of the selector move, and switching series keeps them. There are no presets, no normalization and no per-scan adjustment. A note under the selector explains why values can shift.
-- The cube and clip controls use plain X, Y and Z axes, so the screen makes no left or right claim. Handedness has its own test.
+- The cube and Section Analysis controls use plain X, Y and Z axes, so the screen makes no left or right claim. Handedness has its own test.
 - Series with irregular spacing, missing slices or thick slices show a warning. Missing position data stops the load with a clear message.
 - Series flagged as having burned-in annotations are not uploaded.
 

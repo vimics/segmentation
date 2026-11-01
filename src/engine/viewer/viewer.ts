@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { TrackballControls } from 'three/addons/controls/TrackballControls.js';
 import type { StructureMesh, SurfaceResult, Vec3 } from '../types';
+import { faceOn, poseOf, rolledUp, squaredUp, upFacing } from './orientation';
 
 const IVORY = 0xf6ecd6, CAP = 0xcdbb99, HIGHLIGHT = 0x4cb088;
 const FACES: Record<string, Vec3> = { z: [0, 0, 1], '-z': [0, 0, -1], x: [1, 0, 0], '-x': [-1, 0, 0], y: [0, 1, 0], '-y': [0, -1, 0] };
@@ -28,6 +29,8 @@ export interface ViewerEvents {
   onMeasurementsChanged(list: Measurement[]): void;
   onToolChanged(tool: MeasureKind | null): void;
   onStructureClicked(index: number | null, x: number, y: number): void;
+  /** The view reached, or left, a straight look at one cube face. */
+  onFaceOnChanged(faceOn: boolean): void;
   onCameraMoved(): void;
 }
 
@@ -56,7 +59,12 @@ export class Viewer {
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
   private camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 1000);
-  private controls: OrbitControls;
+  private controls: TrackballControls;
+  /** Runs only during a drag, so an idle page draws nothing. */
+  private gestureFrame = 0;
+  /** Where the camera is flying to, so a quick second click starts from there. */
+  private flight: { dir: THREE.Vector3; up: THREE.Vector3 } | null = null;
+  private wasFaceOn = false;
   private root = new THREE.Group();
   private structures: StructureView[] = [];
   private frame = 0;
@@ -137,14 +145,35 @@ export class Viewer {
   }
 
   private makeControls() {
-    const c = new OrbitControls(this.camera, this.el.canvas);
-    c.enableDamping = false;
+    const c = new TrackballControls(this.camera, this.el.canvas);
+    c.staticMoving = true;
+    c.rotateSpeed = 4;
+    c.zoomSpeed = 2;
     c.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
     c.minZoom = 0.3;
     c.maxZoom = 40;
+    // By default holding A, S or D changes what a drag does, even while typing in a form field.
+    c.keys = ['None', 'None', 'None'];
+    if (this.controls) c.target.copy(this.controls.target);
     c.addEventListener('change', () => this.requestRender());
-    c.addEventListener('start', () => this.events.onCameraMoved());
+    c.addEventListener('start', () => {
+      this.events.onCameraMoved();
+      cancelAnimationFrame(this.anim);
+      this.flight = null;
+      const tick = () => { c.update(); this.gestureFrame = requestAnimationFrame(tick); };
+      cancelAnimationFrame(this.gestureFrame);
+      this.gestureFrame = requestAnimationFrame(tick);
+    });
+    c.addEventListener('end', () => {
+      cancelAnimationFrame(this.gestureFrame);
+      c.update();
+    });
     return c;
+  }
+
+  /** The control scales a pan by camera distance and window width, so this makes the model follow the pointer exactly. */
+  private syncPanSpeed() {
+    this.controls.panSpeed = (this.el.canvas.clientWidth || 1) / this.distance;
   }
 
   requestRender() {
@@ -155,6 +184,8 @@ export class Viewer {
     const w = this.el.host.clientWidth, h = this.el.host.clientHeight;
     if (!w || !h) return;
     this.renderer.setSize(w, h, false);
+    this.controls.handleResize();
+    this.syncPanSpeed();
     this.applyFrustum();
     this.requestRender();
   }
@@ -272,9 +303,11 @@ export class Viewer {
     this.camera.far = this.distance * 2 + radius * 2;
     this.camera.updateProjectionMatrix();
     this.controls.target.copy(center);
-    if (animate) this.flyTo(dir, 1);
+    this.syncPanSpeed();
+    if (animate) this.flyTo(dir, 1, upFacing(dir, this.upDir));
     else {
       this.camera.zoom = 1;
+      this.camera.up.copy(upFacing(dir, this.upDir));
       this.camera.position.copy(center).addScaledVector(dir, this.distance);
       this.camera.updateProjectionMatrix();
       this.controls.update();
@@ -287,27 +320,37 @@ export class Viewer {
     const f = FACES[face];
     if (!f) return;
     const dir = new THREE.Vector3(...f);
-    // Looking straight along the up direction would make the orbit undefined.
-    if (Math.abs(dir.dot(this.upDir)) > 0.999) dir.addScaledVector(new THREE.Vector3(1, 1, 1).cross(this.upDir).normalize(), 0.002).normalize();
-    this.flyTo(dir);
+    this.flyTo(dir, this.camera.zoom, squaredUp(dir, this.flight?.up ?? this.camera.up));
   }
 
-  private flyTo(dir: THREE.Vector3, zoom = this.camera.zoom) {
+  /** Turns a face-on view by a quarter turn. Starts from where a flight is heading, so fast clicks stay on exact steps. */
+  rollView(sign: 1 | -1) {
+    const axis = faceOn(this.flight?.dir ?? this.camera.position.clone().sub(this.controls.target));
+    if (!axis) return;
+    this.flyTo(axis, this.camera.zoom, rolledUp(axis, squaredUp(axis, this.flight?.up ?? this.camera.up), sign));
+  }
+
+  private flyTo(dir: THREE.Vector3, zoom = this.camera.zoom, up?: THREE.Vector3) {
     cancelAnimationFrame(this.anim);
-    const from = this.camera.position.clone().sub(this.controls.target).normalize();
     const to = dir.clone().normalize();
-    const q = new THREE.Quaternion().setFromUnitVectors(from, to), identity = new THREE.Quaternion();
+    const toUp = up ? up.clone() : upFacing(to, this.camera.up);
+    const start = poseOf(this.camera.position.clone().sub(this.controls.target), this.camera.up);
+    const end = poseOf(to, toUp);
+    this.flight = { dir: to, up: toUp };
     const t0 = performance.now(), z0 = this.camera.zoom;
     const duration = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 420;
     const step = (now: number) => {
       const u = duration ? Math.min(1, (now - t0) / duration) : 1, s = u * u * (3 - 2 * u);
-      const d = from.clone().applyQuaternion(identity.clone().slerp(q, s));
+      const pose = start.clone().slerp(end, s);
+      const d = new THREE.Vector3(0, 0, 1).applyQuaternion(pose);
       this.camera.position.copy(this.controls.target).addScaledVector(d, this.distance);
+      this.camera.up.set(0, 1, 0).applyQuaternion(pose);
       this.camera.zoom = z0 + (zoom - z0) * s;
       this.camera.updateProjectionMatrix();
       this.controls.update();
       this.requestRender();
       if (u < 1) this.anim = requestAnimationFrame(step);
+      else this.flight = null;
     };
     this.anim = requestAnimationFrame(step);
   }
@@ -504,6 +547,12 @@ export class Viewer {
     const e = new THREE.Matrix4().extractRotation(this.camera.matrixWorldInverse).elements.slice();
     for (const n of [1, 4, 6, 9]) e[n] = -e[n];
     this.el.cube.style.transform = `matrix3d(${e.join(',')})`;
+
+    const isFaceOn = !!faceOn(this.camera.position.clone().sub(this.controls.target));
+    if (isFaceOn !== this.wasFaceOn) {
+      this.wasFaceOn = isFaceOn;
+      this.events.onFaceOnChanged(isFaceOn);
+    }
   }
 
   private niceScale(pxPerMm: number, minPx: number): number {
