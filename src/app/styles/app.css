@@ -17,7 +17,7 @@
   --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --b1: 4px; --b2: 8px; --b3: 12px; --b4: 16px; --b5: 24px; --b6: 32px; --b7: 48px;
   --r2: 4px;
-  --sahne: #F7F8FA; --kontrol: 36px;
+  --sahne: #F7F8FA; --kontrol: 36px; --kontrol-kucuk: 32px;
 }
 :root[data-theme="dark"] {
   --zemin: #26497F; --zemin-yukseltilmis: #244870;
@@ -27,7 +27,7 @@
   --logo-monogram: #FFFFFF; --logo-kelime: #4CB088;
   --sahne: #244870; color-scheme: dark;
 }
-@media (pointer: coarse) { :root { --kontrol: 44px; } }
+@media (pointer: coarse) { :root { --kontrol: 44px; --kontrol-kucuk: 44px; } }
 
 * { box-sizing: border-box; }
 html, body { height: 100%; }
@@ -64,7 +64,7 @@ h1, h2, p { margin: 0; }
 .calisma { display: grid; grid-template-columns: 276px minmax(0, 1fr); min-height: 0; }
 
 .ray { min-height: 0; overflow-y: auto; background: var(--zemin); border-right: 1px solid var(--ayrac); }
-.bolme { display: grid; gap: var(--b3); padding: var(--b4); border-bottom: 1px solid var(--ayrac); }
+.bolme { display: grid; gap: 10px; padding: 14px var(--b4); border-bottom: 1px solid var(--ayrac); }
 .bolme-bas { display: flex; justify-content: space-between; align-items: baseline; gap: var(--b2); }
 .bolme-not { font: 400 12.5px/1.45 var(--mono); color: var(--metin-ikincil); }
 
@@ -86,7 +86,7 @@ select.secim { width: 100%; height: var(--kontrol); padding: 0 var(--b2); backgr
 .aralik input[type="range"]::-webkit-slider-thumb { pointer-events: auto; }
 .aralik input[type="range"]::-moz-range-thumb { pointer-events: auto; }
 .aralik input[type="range"].ustte { z-index: 1; }
-.esik-not { font-size: 12.5px; line-height: 1.45; color: var(--metin-ikincil); }
+.esik-not { font-size: 12px; line-height: 1.4; color: var(--metin-ikincil); text-align: justify; hyphens: auto; }
 
 input[type="range"] { --dolu: 0%; -webkit-appearance: none; appearance: none; width: 100%; height: 24px; margin: 0; background: transparent; cursor: pointer; }
 input[type="range"]::-webkit-slider-runnable-track { height: 2px; background: linear-gradient(to right, var(--vurgu) var(--dolu), var(--kenarlik) var(--dolu)); }
@@ -102,7 +102,7 @@ input[type="range"]:disabled { opacity: 0.35; cursor: default; }
 .dilim button[aria-pressed="true"] { background: var(--eylem-zemin); color: var(--eylem-metin); }
 
 .yapilar { list-style: none; margin: 0; padding: 0; }
-.yapilar li { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; gap: var(--b2); min-height: 32px; font-size: 14px; border-radius: var(--r2); cursor: pointer; }
+.yapilar li { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; gap: var(--b2); min-height: 30px; font-size: 13px; border-radius: var(--r2); cursor: pointer; }
 .yapilar li:hover span:first-of-type { color: var(--baslik); }
 .yapilar li.secili span:first-of-type { color: var(--baslik); font-weight: 600; }
 .yapilar .hacim { font: 400 12.5px/1 var(--mono); color: var(--metin-ikincil); }
@@ -111,10 +111,10 @@ input[type="checkbox"] { -webkit-appearance: none; appearance: none; width: 14px
 input[type="checkbox"]::before { content: ""; width: 8px; height: 8px; background: transparent; }
 input[type="checkbox"]:checked::before { background: var(--vurgu-anlamli); }
 
-.kesit { display: grid; grid-template-columns: 16px 34px minmax(0, 1fr); align-items: center; gap: var(--b2); min-height: 28px; font: 400 12.5px/1 var(--mono); }
+.kesit { display: grid; grid-template-columns: 16px 34px minmax(0, 1fr); align-items: center; gap: var(--b2); min-height: 26px; font: 400 12.5px/1 var(--mono); }
 
 .olcu-araclar { display: grid; grid-template-columns: 1fr 1fr; gap: var(--b2); }
-.arac { min-height: var(--kontrol); background: var(--zemin); border: 1px solid var(--kenarlik-kontrol); border-radius: var(--r2); font-size: 14px; font-weight: 500; cursor: pointer; }
+.arac { min-height: var(--kontrol-kucuk); background: var(--zemin); border: 1px solid var(--kenarlik-kontrol); border-radius: var(--r2); font-size: 13px; font-weight: 500; cursor: pointer; }
 .arac:hover { background: var(--zemin-yukseltilmis); }
 .arac[aria-pressed="true"] { background: var(--eylem-zemin); color: var(--eylem-metin); border-color: var(--eylem-zemin); }
 .olculer { list-style: none; margin: 0; padding: 0; }
@@ -231,14 +231,15 @@ input[type="checkbox"]:checked::before { background: var(--vurgu-anlamli); }
 .depo-durum { display: grid; gap: var(--b2); font-size: 13.5px; line-height: 1.45; }
 .depo-durum .cubuk { margin-top: 2px; }
 .depo-ref { font: 500 12.5px/1.4 var(--mono); color: var(--alt-baslik); word-break: break-all; }
-.yakinda { display: grid; gap: var(--b1); margin: var(--b4) var(--b4) 0; padding: var(--b3) var(--b3) var(--b3) var(--b4); background: var(--zemin-yukseltilmis); border: 1px solid var(--kenarlik); border-left: 3px solid var(--vurgu); border-radius: var(--r2); font-size: 13.5px; line-height: 1.45; }
-/* Seven rows of 32 px, then it scrolls. */
-.yapilar { max-height: 224px; overflow-y: auto; margin-top: var(--b3); }
+.yakinda { display: grid; gap: var(--b1); margin: 14px var(--b4) 0; padding: 10px var(--b3) 10px 14px; background: var(--zemin-yukseltilmis); border: 1px solid var(--kenarlik); border-left: 3px solid var(--vurgu); border-radius: var(--r2); font-size: 12px; line-height: 1.4; }
+/* Seven rows of 30 px, then it scrolls. */
+.yapilar { max-height: 210px; overflow-y: auto; margin-top: var(--b3); }
 
 /* Filters */
-.filtre-not { font-size: 12px; line-height: 1.45; font-weight: 300; color: var(--metin-ikincil); }
+.filtre-not { font-size: 11.5px; line-height: 1.4; font-weight: 300; color: var(--metin-ikincil); text-align: justify; hyphens: auto; }
+.yakinda p:not(.etiket) { text-align: justify; }
 .filtre-liste { display: grid; }
-.filtre { display: grid; grid-template-columns: 16px minmax(0, 1fr); align-items: center; gap: var(--b2); min-height: 32px; font-size: 14px; cursor: pointer; }
+.filtre { display: grid; grid-template-columns: 16px minmax(0, 1fr); align-items: center; gap: var(--b2); min-height: 28px; font-size: 13px; cursor: pointer; }
 
 /* A section that opens on click */
 .acilir { display: block; }
