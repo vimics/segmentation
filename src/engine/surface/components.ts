@@ -1,7 +1,9 @@
 import type { MeshData, StructureMesh, Vec3 } from '../types';
 
-export const MAX_STRUCTURES = 60;
+/** Pieces of each kind that keep their own mesh, so they can be listed and hidden one by one. */
+export const MAX_LISTED = 50;
 const MIN_STRUCTURE_MM3 = 8;
+const MAX_CAVITY_HOMES = 500;
 
 function signedTetra(p: Float32Array, a: number, b: number, c: number): number {
   const ax = p[a * 3], ay = p[a * 3 + 1], az = p[a * 3 + 2];
@@ -21,12 +23,27 @@ interface Group {
   children: Group[];
 }
 
+/** Pieces that end up in one mesh: a single listed piece, or everything beyond the list. */
+interface Bucket {
+  groups: Group[];
+  hiddenAs: StructureMesh['hiddenAs'];
+  listed: boolean;
+}
+
+export interface SplitResult {
+  structures: StructureMesh[];
+  shellCount: number;
+  fragmentCount: number;
+  boneCount: number;
+}
+
 /**
  * Splits a surface into connected pieces. Connectivity follows the mesh, so memory grows with
  * the surface and not with the scan. Cavities (inward-facing shells) stay with the piece that
- * contains them, so clipping still shows hollow bone correctly.
+ * contains them, so clipping still shows hollow bone correctly. Shells are discarded unless asked for,
+ * and then share one mesh, so even tens of thousands of them cost one draw call.
  */
-export function splitStructures(mesh: MeshData, extent: { lengthMm: number }): { structures: StructureMesh[]; specksRemoved: number } {
+export function splitStructures(mesh: MeshData, extent: { lengthMm: number }, opts: { keepShells?: boolean } = {}): SplitResult {
   const { positions: p, indices: t } = mesh;
   const vertexCount = p.length / 3;
   const parent = new Int32Array(vertexCount);
@@ -66,30 +83,51 @@ export function splitStructures(mesh: MeshData, extent: { lengthMm: number }): {
   const solids = all.filter((g) => g.signedVolume > 0).sort((a, b) => b.signedVolume - a.signedVolume);
   const cavities = all.filter((g) => g.signedVolume <= 0);
 
-  const kept = solids.filter((g) => g.signedVolume >= MIN_STRUCTURE_MM3).slice(0, MAX_STRUCTURES);
-  const specksRemoved = solids.length - kept.length;
+  const pieces = solids.filter((g) => g.signedVolume >= MIN_STRUCTURE_MM3);
+  const shells = solids.filter((g) => g.signedVolume < MIN_STRUCTURE_MM3);
 
+  // Noisy scans can hold huge numbers of pieces, and only the largest are likely to contain cavities.
+  const homes = pieces.slice(0, MAX_CAVITY_HOMES);
+  const orphans: Group[] = [];
   for (const cavity of cavities) {
-    const home = kept.find((g) => g.min.every((m, d) => m <= cavity.min[d]) && g.max.every((m, d) => m >= cavity.max[d]));
-    if (home) home.children.push(cavity);
+    const home = homes.find((g) => g.min.every((m, d) => m <= cavity.min[d]) && g.max.every((m, d) => m >= cavity.max[d]));
+    if (home) home.children.push(cavity); else orphans.push(cavity);
   }
 
-  const owner = new Map<number, Group>();
-  for (const g of kept) {
-    owner.set(g.root, g);
-    for (const c of g.children) owner.set(c.root, g);
-  }
+  const withCavities = (g: Group) => g.children.reduce((sum, c) => sum + c.signedVolume, g.signedVolume);
+  const hiddenAsOf = (g: Group): StructureMesh['hiddenAs'] => {
+    const volumeMm3 = withCavities(g);
+    return looksLikeTable(g, volumeMm3, extent.lengthMm) ? 'table' : looksLikeFragment(g, volumeMm3) ? 'fragment' : null;
+  };
+  const kinds = new Map(pieces.map((g) => [g, hiddenAsOf(g)]));
+  const bones = pieces.filter((g) => kinds.get(g) === null);
+  const fragments = pieces.filter((g) => kinds.get(g) !== null);
 
-  const triLists = new Map<Group, number[]>();
-  const remap = new Map<Group, Int32Array>();
-  const vertexLists = new Map<Group, number[]>();
-  for (const g of kept) { triLists.set(g, []); vertexLists.set(g, []); remap.set(g, new Int32Array(0)); }
+  // The largest pieces of each kind stay separate. The rest share one mesh, so nothing is lost to a cap.
+  const buckets: Bucket[] = [];
+  const addLayer = (list: Group[], hiddenAs: (g: Group) => StructureMesh['hiddenAs'], merged: StructureMesh['hiddenAs']) => {
+    for (const g of list.slice(0, MAX_LISTED)) buckets.push({ groups: [g], hiddenAs: hiddenAs(g), listed: true });
+    if (list.length > MAX_LISTED) buckets.push({ groups: list.slice(MAX_LISTED), hiddenAs: merged, listed: false });
+  };
+  addLayer(bones, () => null, null);
+  addLayer(fragments, (g) => kinds.get(g) ?? 'fragment', 'fragment');
+  if (opts.keepShells && (shells.length || orphans.length)) buckets.push({ groups: [...shells, ...orphans], hiddenAs: 'shell', listed: false });
 
+  const owner = new Map<number, number>();
+  buckets.forEach((bucket, b) => {
+    for (const g of bucket.groups) {
+      owner.set(g.root, b);
+      for (const c of g.children) owner.set(c.root, b);
+    }
+  });
+
+  const triLists: number[][] = buckets.map(() => []);
+  const vertexLists: number[][] = buckets.map(() => []);
   const localIndex = new Int32Array(vertexCount).fill(-1);
   for (let n = 0; n < t.length; n += 3) {
-    const g = owner.get(find(t[n]));
-    if (!g) continue;
-    const list = triLists.get(g) as number[], verts = vertexLists.get(g) as number[];
+    const b = owner.get(find(t[n]));
+    if (b === undefined) continue;
+    const list = triLists[b], verts = vertexLists[b];
     for (let c = 0; c < 3; c++) {
       const v = t[n + c];
       if (localIndex[v] < 0) { localIndex[v] = verts.length; verts.push(v); }
@@ -97,8 +135,8 @@ export function splitStructures(mesh: MeshData, extent: { lengthMm: number }): {
     }
   }
 
-  const structures = kept.map((g): StructureMesh => {
-    const verts = vertexLists.get(g) as number[];
+  const structures = buckets.map((bucket, b): StructureMesh => {
+    const verts = vertexLists[b];
     const positions = new Float32Array(verts.length * 3);
     const normals = new Float32Array(verts.length * 3);
     const colors = new Float32Array(verts.length * 3);
@@ -109,24 +147,24 @@ export function splitStructures(mesh: MeshData, extent: { lengthMm: number }): {
         colors[i * 3 + d] = mesh.colors[v * 3 + d];
       }
     });
-    const volumeMm3 = g.children.reduce((sum, c) => sum + c.signedVolume, g.signedVolume);
-    const hiddenAs = looksLikeTable(g, volumeMm3, extent.lengthMm) ? 'table' as const : looksLikeFragment(g, volumeMm3) ? 'fragment' as const : null;
+    const bboxMin: Vec3 = [Infinity, Infinity, Infinity], bboxMax: Vec3 = [-Infinity, -Infinity, -Infinity];
+    for (const g of bucket.groups) for (let d = 0; d < 3; d++) {
+      if (g.min[d] < bboxMin[d]) bboxMin[d] = g.min[d];
+      if (g.max[d] > bboxMax[d]) bboxMax[d] = g.max[d];
+    }
     return {
       positions, normals, colors,
-      indices: Uint32Array.from(triLists.get(g) as number[]),
-      volumeMm3,
-      autoHidden: hiddenAs !== null,
-      hiddenAs,
-      bboxMin: g.min,
-      bboxMax: g.max,
+      indices: Uint32Array.from(triLists[b]),
+      volumeMm3: bucket.groups.reduce((sum, g) => sum + withCavities(g), 0),
+      autoHidden: bucket.hiddenAs !== null,
+      hiddenAs: bucket.hiddenAs,
+      listed: bucket.listed,
+      bboxMin,
+      bboxMax,
     };
   });
 
-  // If everything looks like a table, the guess is wrong; show what there is.
-  if (structures.length && structures.every((s) => s.autoHidden)) for (const s of structures) { s.autoHidden = false; s.hiddenAs = null; }
-  // Hidden guesses go last, so the list starts with the bones.
-  structures.sort((x, y) => Number(x.autoHidden) - Number(y.autoHidden));
-  return { structures, specksRemoved };
+  return { structures, shellCount: shells.length, fragmentCount: fragments.length, boneCount: bones.length };
 }
 
 /**

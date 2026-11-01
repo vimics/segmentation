@@ -63,7 +63,7 @@ for (const label of CASES) {
       await page.locator('#klasor').setInputFiles(join(ROOT, label));
       const started = Date.now();
       await page.click('#basla');
-      await page.locator('#yapilar li').first().waitFor({ timeout: 900_000 });
+      await page.locator('#ozet', { hasText: 'triangles' }).waitFor({ timeout: 900_000 });
       const modelSeconds = (Date.now() - started) / 1000;
       const peakAtModel = peak;
       await expect(page.locator('#depo')).toContainText('BV-TEST', { timeout: 1_200_000 });

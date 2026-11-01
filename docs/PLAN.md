@@ -37,7 +37,7 @@ Viewer header order: `Patient Name · Cat or Dog · Breed · Age · Weight kg ·
 3. **Decode:** uncompressed (implicit, explicit, big endian, deflated), RLE, JPEG Lossless, JPEG-LS and JPEG 2000. Rescale to Hounsfield units.
 4. **Build the volume:** sort slices along the slice normal. Vertices use each slice's own position, so uneven spacing and gantry tilt stay correct in true millimetres. No resampling.
 5. **Extract the surface:** marching cubes. Half-resolution preview first, then full. A triangle budget chooses the level, and the footer states the mesh resolution.
-6. **Clean up:** connected components on the mesh. Drop specks, attach internal cavities to their parent, and auto-hide table-like shells. Click to hide as the reliable fallback.
+6. **Clean up:** connected components on the mesh, with internal cavities attached to their parent. Two filters, both on by default: Small shells (under 8 mm³, built only when turned off) and Thin fragments (under 0.5 mm mean thickness, plus the table). The largest 50 pieces are listed under a collapsed Structures dropdown, where a piece hidden by clicking comes back.
 7. **Render:** orthographic camera, so the scale bar is true at any depth. Ivory material with occlusion baked into vertices from the volume.
 8. **Pick:** GPU position buffer, the same cost at any triangle count and correct under clipping.
 

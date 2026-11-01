@@ -97,8 +97,10 @@ export interface MeshData {
 export interface StructureMesh extends MeshData {
   volumeMm3: number;
   autoHidden: boolean;
-  /** Why it was hidden, when it was */
-  hiddenAs: 'table' | 'fragment' | null;
+  /** Which filter covers it, if any */
+  hiddenAs: 'table' | 'fragment' | 'shell' | null;
+  /** Has its own mesh, so it can be listed and hidden on its own */
+  listed: boolean;
   bboxMin: Vec3;
   bboxMax: Vec3;
 }
@@ -106,7 +108,11 @@ export interface StructureMesh extends MeshData {
 export interface SurfaceResult {
   structures: StructureMesh[];
   triangles: number;
-  specksRemoved: number;
+  /** Pieces under 8 mm³, counted whether or not their geometry was kept */
+  shellCount: number;
+  /** Thin fragments, the table included */
+  fragmentCount: number;
+  boneCount: number;
   resolutionMm: number;
   range: HuRange;
   quality: 'preview' | 'full';

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { buildSampleVolume } from '../src/engine/sample/bone';
 import { BONE_RANGE, HU_MAX } from '../src/engine/hu';
-import { SurfaceEngine } from '../src/engine/surface/pipeline';
+import { MAX_LISTED } from '../src/engine/surface/components';
+import { SHELL_ALLOWANCE, SurfaceEngine } from '../src/engine/surface/pipeline';
 import type { StructureMesh, Vec3, Volume } from '../src/engine/types';
 
 function volumeFrom(opts: {
@@ -101,7 +102,7 @@ describe('structures', () => {
   const spheres = (a: number[][]) => (x: number, y: number, z: number) => Math.max(...a.map(([cx, cy, cz, r]) => sphere([cx, cy, cz], r)(x, y, z)));
 
   it('separates bones, sorted by size, and drops specks', () => {
-    const { structures, specksRemoved } = new SurfaceEngine(volumeFrom({ hu: spheres([[12, 20, 20, 8], [30, 20, 20, 5], [34, 34, 34, 0.9]]) })).full(above(250));
+    const { structures, shellCount: specksRemoved } = new SurfaceEngine(volumeFrom({ hu: spheres([[12, 20, 20, 8], [30, 20, 20, 5], [34, 34, 34, 0.9]]) })).full(above(250));
     expect(structures.length).toBe(2);
     expect(structures[0].volumeMm3).toBeGreaterThan(structures[1].volumeMm3);
     expect(specksRemoved).toBe(1);
@@ -232,5 +233,92 @@ describe('a two-ended density range', () => {
     expect(BONE_RANGE).toEqual({ min: 226, max: 1988 });
     const { structures } = new SurfaceEngine(buildSampleVolume()).full(BONE_RANGE);
     expect(structures.filter((s) => !s.autoHidden).length).toBeGreaterThan(0);
+  });
+});
+
+describe('the shell allowance', () => {
+  it('keeps full resolution when shells only just pass the budget, and still stops at the allowance', () => {
+    let seed = 7;
+    const noise = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    // Isolated single voxels: nothing but small shells.
+    const volume = volumeFrom({ nx: 160, ny: 160, nz: 100, hu: () => (noise() > 0.97 ? 1000 : -1000) });
+    const plain = new SurfaceEngine(volume);
+    const shells = plain.full(BONE_RANGE, true).triangles;
+    expect(shells).toBeGreaterThan(0);
+
+    const near = new SurfaceEngine(volume, 1).full(BONE_RANGE, true);
+    expect(shells).toBeLessThan(SHELL_ALLOWANCE);
+    expect(near.resolutionMm).toBe(0.5);
+    expect(near.triangles).toBe(shells);
+  });
+});
+
+describe('layers behind the filters', () => {
+  // One large bone, a thin hollow shell (a thin fragment), and tiny spheres under 8 mm³ (small shells).
+  const scene = (x: number, y: number, z: number) => {
+    const shell = Math.hypot(x - 12, y - 12, z - 12);
+    const tiny = [[34, 8, 8], [34, 14, 8], [34, 20, 8]].map(([a, b, c]) => sphere([a, b, c], 0.7, 0.2)(x, y, z));
+    return Math.max(shell > 8 && shell < 8.4 ? 1000 : -1000, sphere([28, 30, 30], 6)(x, y, z), ...tiny);
+  };
+  const build = () => new SurfaceEngine(volumeFrom({ nx: 160, ny: 160, nz: 160, dx: 0.25, dy: 0.25, zAt: (k) => k * 0.25, hu: scene }));
+  const layer = (r: { structures: StructureMesh[] }, kind: StructureMesh['hiddenAs']) => r.structures.filter((s) => s.hiddenAs === kind);
+
+  it('sorts each piece into one layer and reports the counts', () => {
+    const r = build().full(BONE_RANGE);
+    expect(r.boneCount).toBe(1);
+    expect(r.fragmentCount).toBe(layer(r, 'fragment').length);
+    expect(r.fragmentCount).toBeGreaterThan(0);
+    expect(r.shellCount).toBe(3);
+    expect(layer(r, null).length).toBe(1);
+  });
+
+  it('builds small shells only when asked, and the counts stay the same', () => {
+    const engine = build();
+    const plain = engine.full(BONE_RANGE);
+    const kept = engine.full(BONE_RANGE, true);
+    expect(layer(plain, 'shell').length).toBe(0);
+    expect(layer(kept, 'shell').length).toBe(1);
+    expect(kept.shellCount).toBe(plain.shellCount);
+    expect(kept.fragmentCount).toBe(plain.fragmentCount);
+    expect(kept.triangles).toBeGreaterThan(plain.triangles);
+    // The bone itself is untouched.
+    expect(layer(kept, null)[0].indices.length).toBe(layer(plain, null)[0].indices.length);
+    expect(layer(kept, 'shell')[0].listed).toBe(false);
+  });
+
+  it('counts the table as a thin fragment', () => {
+    const r = new SurfaceEngine(buildSampleVolume()).full(BONE_RANGE);
+    expect(layer(r, 'table').length).toBe(1);
+    expect(r.fragmentCount).toBeGreaterThanOrEqual(1);
+  });
+
+  it('merges pieces beyond the list instead of dropping them', () => {
+    // Spheres on a grid, each large enough to count as bone: more than the list can hold.
+    const centers: number[][] = [];
+    for (let a = 0; a < 8; a++) for (let b = 0; b < 8; b++) centers.push([4 + a * 5, 4 + b * 5, 10]);
+    const volume = volumeFrom({ nx: 96, ny: 96, nz: 40, hu: (x, y, z) => {
+      const ci = Math.round((x - 4) / 5), cj = Math.round((y - 4) / 5);
+      if (ci < 0 || ci > 7 || cj < 0 || cj > 7) return -300;
+      return sphere([4 + ci * 5, 4 + cj * 5, 10], 1.8)(x, y, z);
+    } });
+    const r = new SurfaceEngine(volume).full(BONE_RANGE);
+    const listed = r.structures.filter((s) => s.listed), merged = r.structures.filter((s) => !s.listed);
+    expect(r.boneCount).toBe(centers.length);
+    expect(listed.length).toBe(MAX_LISTED);
+    expect(merged.length).toBe(1);
+    const total = r.structures.reduce((n, s) => n + s.volumeMm3, 0);
+    const expected = centers.length * (4 / 3) * Math.PI * 1.8 ** 3;
+    expect(total / expected).toBeGreaterThan(0.9);
+    expect(total / expected).toBeLessThan(1.1);
+  });
+
+  it('does not bring hidden pieces back when everything looks like a table', () => {
+    const shell = (x: number, y: number, z: number) => {
+      const d = Math.hypot(x - 20, y - 20, z - 20);
+      return d > 10 && d < 10.4 ? 1000 : -1000;
+    };
+    const { structures, boneCount } = new SurfaceEngine(volumeFrom({ nx: 160, ny: 160, nz: 160, dx: 0.25, dy: 0.25, zAt: (k) => k * 0.25, hu: shell })).full(BONE_RANGE);
+    expect(boneCount).toBe(0);
+    expect(structures.every((s) => s.autoHidden)).toBe(true);
   });
 });

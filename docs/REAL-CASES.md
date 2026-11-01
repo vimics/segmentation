@@ -20,7 +20,7 @@ Four veterinary CT cases, run exactly as received on 2026-10-31. Labels only: th
 | A change of acquisition number means a new volume | One 289-slice volume carries 4 acquisition numbers | Split a series only when positions repeat |
 | The smaller series has lower resolution | Reformats often have smaller pixels (0.18 to 0.24 mm against 0.48 mm), interpolated from the same 0.6 mm data | Most files stays the default, and the smaller series stay selectable |
 | One range fits every scan's bone | Sharp filters overshoot, and the cone-beam scan has soft tissue near 1,120 | Every scan opens at 226 to 1988 HU, and the vet moves both ends |
-| The table is one long shell | At higher thresholds it breaks up, and tubing looks similar | Shells under 0.5 mm mean thickness are auto-hidden, and stay in the list |
+| The table is one long shell | At higher thresholds it breaks up, and tubing looks similar | Pieces under 0.5 mm mean thickness join the table under the Thin fragments filter |
 
 ## Series chosen
 
@@ -67,6 +67,23 @@ Measured densities, every voxel of the series each case opens with:
 | Soft tissue peak | 50 | 1120 | 40 | 40 |
 
 Cat 2's scale is stretched as well as shifted: its air to tissue span is 1965, against about 1045 on the others. Its bone also reaches the 12-bit ceiling of 3071.
+
+## Filters
+
+Two filters sit under the threshold, both on by default. Small shells are pieces under 8 mm³, about a 2 mm cube. Thin fragments are pieces under 0.5 mm mean thickness, plus the table. Their rules are fixed numbers run on each piece, with no judgement at runtime. The 0.5 mm limit was tuned on these four cases and has not been checked against Mimics.
+
+Small shells are built only when the vet turns that filter off, so the default costs nothing extra. They then share one mesh, so one draw call however many there are. They get 2M triangles of room above the 6M budget: without it, Dog 2 coarsened from 0.4 to 0.8 mm as a whole when shells were turned on.
+
+Triangles at 226 to 1988 HU:
+
+| Case | Small shells | Thin fragments | Both filters on | Shells off | Both off |
+|---|---|---|---|---|---|
+| Cat 1 | 51,962 | 43 | 1.94M | 3.05M | 4.09M |
+| Cat 2 | 1,390 | 15 | 2.38M | 2.44M | 2.49M |
+| Dog 1 | 1,969 | 11 | 1.35M | 1.44M | 5.27M |
+| Dog 2 | 41,221 | 34 | 5.02M | 5.69M | 6.09M |
+
+The rebuild took about 1 to 2.5 s. With both filters off and the lower limit at −400 HU, the largest result was 6.2M triangles and browser memory stayed under 3 GB.
 
 ## Timing and memory
 

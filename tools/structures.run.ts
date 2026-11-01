@@ -51,7 +51,7 @@ it('lists structures', async () => {
     for (const iso of list.split(',').map(Number)) {
       const r = engine.full({ min: iso, max: HU_MAX });
       const shown = r.structures.filter((s) => !s.autoHidden);
-      console.log(`${label} [${series.filter} ${series.kernel}${series.reformat ? ' reformat' : ''} ${series.pixelSpacing![0].toFixed(2)}mm] @${iso}: ${shown.length} shown, ${r.structures.length} total, ${r.triangles} triangles, ${r.specksRemoved} specks, shown bone ${(shown.reduce((n, s) => n + s.volumeMm3, 0) / 1000).toFixed(1)} cm3`);
+      console.log(`${label} [${series.filter} ${series.kernel}${series.reformat ? ' reformat' : ''} ${series.pixelSpacing![0].toFixed(2)}mm] @${iso}: ${shown.length} shown, ${r.structures.length} total, ${r.triangles} triangles, ${r.shellCount} shells, shown bone ${(shown.reduce((n, s) => n + s.volumeMm3, 0) / 1000).toFixed(1)} cm3`);
       if (process.env.COMPARE) continue;
       for (const s of r.structures.slice(0, 26)) {
         const size = [0, 1, 2].map((d) => s.bboxMax[d] - s.bboxMin[d]).sort((a, b) => b - a);

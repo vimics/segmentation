@@ -21,6 +21,15 @@ const walk = (dir: string, out: string[] = []): string[] => {
   return out;
 };
 
+/** Memory of the test browser's processes together, in MB. */
+function browserMemoryMb(): number {
+  let kb = 0;
+  for (const line of execFileSync('ps', ['-A', '-o', 'rss=,command=']).toString().split('\n')) {
+    if (/chrome-headless-shell|headless_shell|chromium-\d+/i.test(line)) kb += parseInt(line, 10) || 0;
+  }
+  return Math.round(kb / 1024);
+}
+
 test.describe.configure({ mode: 'serial' });
 test.skip(!OUT, 'Set REAL_OUT to a folder outside the repository to run the real cases.');
 
@@ -58,7 +67,7 @@ for (const label of CASES) {
     const shot: Record<string, unknown> = {};
     await Promise.race([
       page.locator('#perde-hata').waitFor({ state: 'visible', timeout: 800_000 }),
-      page.locator('#yapilar li').first().waitFor({ timeout: 800_000 }).then(() => page.locator('#iyilestir').waitFor({ state: 'hidden', timeout: 800_000 })),
+      page.locator('#ozet', { hasText: 'triangles' }).waitFor({ timeout: 800_000 }).then(() => page.locator('#iyilestir').waitFor({ state: 'hidden', timeout: 800_000 })),
     ]);
     shot.seconds = +((Date.now() - opened) / 1000).toFixed(1);
     shot.setupSeconds = +((opened - started) / 1000).toFixed(1);
@@ -74,6 +83,8 @@ for (const label of CASES) {
       shot.seriesChoices = await page.locator('#seri option').allTextContents();
       shot.warnings = await page.locator('#uyarilar p').allTextContents();
       shot.structures = await page.locator('#yapilar li').allTextContents();
+      shot.filterNote = await page.locator('#filtre-not').textContent();
+      shot.memoryMbFiltersOn = browserMemoryMb();
       await page.locator('.sahne').screenshot({ path: join(OUT, `${label}-default.png`) });
       // SWEEP=cat2:1500,1800;cat1:400 also builds and captures those lower limits.
       const sweep = (process.env.SWEEP ?? '').split(';').find((e) => e.startsWith(`${label}:`))?.split(':')[1].split(',') ?? [];
@@ -88,6 +99,25 @@ for (const label of CASES) {
         results[hu] = { summary: await page.locator('#ozet').textContent(), structures: (await page.locator('#yapilar li').allTextContents()).slice(0, 5) };
       }
       shot.sweep = results;
+
+      // What turning the filters off costs, at the default range and at a very low one, where noise is worst.
+      const settle = async () => {
+        await page.waitForTimeout(1200);
+        await page.locator('#iyilestir').waitFor({ state: 'hidden', timeout: 600_000 });
+        await page.waitForTimeout(400);
+      };
+      const offStarted = Date.now();
+      await page.uncheck('#filtre-kabuk');
+      await settle();
+      shot.shellsOff = { summary: await page.locator('#ozet').textContent(), seconds: +((Date.now() - offStarted - 1600) / 1000).toFixed(1), memoryMb: browserMemoryMb() };
+      await page.uncheck('#filtre-parca');
+      await page.locator('.sahne').screenshot({ path: join(OUT, `${label}-filters-off.png`) });
+      shot.allOff = { summary: await page.locator('#ozet').textContent() };
+      const lowStarted = Date.now();
+      await page.fill('#esik-sayi-min', '-400');
+      await page.press('#esik-sayi-min', 'Enter');
+      await settle();
+      shot.veryLow = { summary: await page.locator('#ozet').textContent(), seconds: +((Date.now() - lowStarted - 1600) / 1000).toFixed(1), memoryMb: browserMemoryMb() };
     }
     shot.outsideRequests = outside;
     shot.pageErrors = problems;

@@ -168,18 +168,37 @@ function centerOf(s: { bboxMin: Vec3; bboxMax: Vec3 }): Vec3 {
   return [(s.bboxMin[0] + s.bboxMax[0]) / 2, (s.bboxMin[1] + s.bboxMax[1]) / 2, (s.bboxMin[2] + s.bboxMax[2]) / 2];
 }
 
-function resolveVisibility(s: StructureMesh): boolean {
+/** On means those pieces are hidden. Small shells only exist as geometry once their filter has been turned off. */
+const filters = { shells: true, fragments: true };
+
+function pieceVisible(s: StructureMesh): boolean {
+  if (s.hiddenAs === 'shell') return !filters.shells;
+  if (s.hiddenAs && filters.fragments) return false;
+  if (!s.listed) return true;
   const o = overrides.find((c) => c.center.every((v, d) => v >= s.bboxMin[d] && v <= s.bboxMax[d]));
-  return o ? o.visible : !s.autoHidden;
+  return o ? o.visible : true;
 }
+
+const MAX_ROWS = 50;
+/** Names of the pieces in the list, by their place in the surface. */
+let rowNames = new Map<number, string>();
 
 function renderStructures() {
   const ul = $('yapilar');
   ul.replaceChildren();
+  rowNames = new Map();
   if (!latestSurface) return;
+  const { structures, boneCount, fragmentCount } = latestSurface;
   let n = 0;
-  latestSurface.structures.forEach((s, i) => {
-    const name = s.hiddenAs === 'table' ? 'Likely scanner table' : s.hiddenAs === 'fragment' ? 'Thin fragment' : `Structure ${++n}`;
+  const names = structures.map((s) => (s.hiddenAs === 'table' ? 'Likely scanner table' : s.hiddenAs === 'fragment' ? 'Thin fragment' : `Structure ${++n}`));
+  const rows = structures
+    .map((s, i) => ({ s, i }))
+    .filter(({ s }) => s.listed && (s.hiddenAs === null || !filters.fragments))
+    .sort((a, b) => b.s.volumeMm3 - a.s.volumeMm3)
+    .slice(0, MAX_ROWS);
+  for (const { s, i } of rows) {
+    const name = names[i];
+    rowNames.set(i, name);
     const li = document.createElement('li');
     li.className = visibility[i] ? '' : 'kapali';
     const box = document.createElement('input');
@@ -191,15 +210,58 @@ function renderStructures() {
     label.textContent = name;
     const size = document.createElement('span');
     size.className = 'hacim';
-    size.textContent = s.autoHidden && !visibility[i] ? 'auto-hidden' : `${(s.volumeMm3 / 1000).toFixed(1)} cm³`;
+    size.textContent = `${(s.volumeMm3 / 1000).toFixed(1)} cm³`;
     li.append(box, label, size);
     li.addEventListener('mouseenter', () => viewer?.highlightStructure(i, true));
     li.addEventListener('mouseleave', () => viewer?.highlightStructure(i, false));
     ul.append(li);
-  });
-  const specks = latestSurface.specksRemoved;
-  $('temizlik').textContent = specks ? `${num(specks)} specks removed` : '';
+  }
+  $('yapilar-not').hidden = boneCount + (filters.fragments ? 0 : fragmentCount) <= MAX_ROWS;
 }
+
+const counted = (n: number, one: string, many: string) => `${num(n)} ${n === 1 ? one : many}`;
+
+function renderFilterNote() {
+  const note = $('filtre-not');
+  const parts: string[] = [];
+  if (latestSurface && filters.shells && latestSurface.shellCount) parts.push(counted(latestSurface.shellCount, 'small shell', 'small shells'));
+  if (latestSurface && filters.fragments && latestSurface.fragmentCount) parts.push(counted(latestSurface.fragmentCount, 'thin fragment', 'thin fragments'));
+  note.hidden = !parts.length;
+  note.textContent = parts.length ? `${parts.join(' and ')} removed.` : '';
+}
+
+/** Says why the view is empty, unless a measuring tool is using the same spot for its instructions. */
+function renderSurfaceHint() {
+  if (viewer?.tool) return;
+  const hint = $('ipucu');
+  if (!latestSurface || visibility.some(Boolean)) { hint.hidden = true; return; }
+  const filtered = latestSurface.structures.length > 0 || latestSurface.shellCount > 0;
+  hint.textContent = filtered ? 'Everything here is filtered. Turn off a filter or change the threshold.' : 'No surface at this threshold. Lower it to see bone.';
+  hint.hidden = false;
+}
+
+function applyVisibility() {
+  if (!latestSurface) return;
+  visibility = latestSurface.structures.map(pieceVisible);
+  visibility.forEach((on, i) => viewer?.setStructureVisible(i, on));
+  renderStructures();
+  renderFilterNote();
+  renderSummary();
+  renderSurfaceHint();
+}
+
+$('filtre-parca').addEventListener('change', (e) => {
+  filters.fragments = (e.target as HTMLInputElement).checked;
+  applyVisibility();
+});
+$('filtre-kabuk').addEventListener('change', (e) => {
+  filters.shells = (e.target as HTMLInputElement).checked;
+  renderFilterNote();
+  // Shells are built only when asked for, so showing them can need a rebuild. Hiding them never does.
+  const built = latestSurface?.structures.some((s) => s.hiddenAs === 'shell');
+  if (filters.shells || built) applyVisibility();
+  else onThresholdSettled();
+});
 
 function setStructure(i: number, on: boolean) {
   if (!latestSurface) return;
@@ -208,15 +270,18 @@ function setStructure(i: number, on: boolean) {
   overrides.push({ center: centerOf(latestSurface.structures[i]), visible: on });
   viewer?.setStructureVisible(i, on);
   renderStructures();
+  renderSummary();
+  renderSurfaceHint();
 }
 
 let selectedStructure: number | null = null;
 function showStructureAction(index: number | null, x: number, y: number) {
   const box = $('aksiyon');
   selectedStructure = index;
-  if (index === null || !latestSurface) { box.hidden = true; return; }
-  const rows = $('yapilar').children[index];
-  $('aksiyon-yazi').textContent = rows?.querySelector('span')?.textContent ?? 'Structure';
+  // Only a piece in the list can be hidden, because the list is the way to bring it back.
+  const name = index === null ? undefined : rowNames.get(index);
+  if (!name || !latestSurface) { box.hidden = true; return; }
+  $('aksiyon-yazi').textContent = name;
   box.style.left = `${x}px`;
   box.style.top = `${y}px`;
   box.hidden = false;
@@ -245,21 +310,20 @@ function renderSummary() {
     pieces.push(`Slice <b>${s.sliceSpacing.toFixed(1)} mm</b>`);
   }
   pieces.push(`Mesh <b>${latestSurface.resolutionMm.toFixed(1)} mm</b>`);
-  pieces.push(`<b>${num(latestSurface.triangles)}</b> triangles`);
+  const shown = latestSurface.structures.reduce((n, s, i) => (visibility[i] ? n + s.indices.length / 3 : n), 0);
+  pieces.push(`<b>${num(shown)}</b> triangles`);
   $('ozet').innerHTML = pieces.join(' · ');
 }
 
 function applySurface(result: SurfaceResult) {
   const v = ensureViewer();
   latestSurface = result;
-  visibility = result.structures.map(resolveVisibility);
+  visibility = result.structures.map(pieceVisible);
   v.setSurface(result, visibility.map((on) => !on));
   renderStructures();
+  renderFilterNote();
   renderSummary();
-  const empty = result.structures.length === 0;
-  const hint = $('ipucu');
-  if (empty) { hint.textContent = 'No surface at this threshold. Lower it to see bone.'; hint.hidden = false; }
-  else if (!viewer?.tool) hint.hidden = true;
+  renderSurfaceHint();
 }
 
 function setupClipRanges() {
@@ -287,7 +351,7 @@ function syncSlider(el: HTMLInputElement) {
 }
 
 function requestSurface(quality: 'preview' | 'full') {
-  const msg: MeshRequest = { type: 'extract', seq: ++seq, range: threshold, quality };
+  const msg: MeshRequest = { type: 'extract', seq: ++seq, range: threshold, keepShells: !filters.shells, quality };
   meshWorker?.postMessage(msg);
 }
 
@@ -346,7 +410,7 @@ function renderTool(tool: MeasureKind | null) {
   if (tool) {
     hint.textContent = tool === 'distance' ? 'Click two points on the bone. Esc to finish.' : 'Click three points; the middle one is the vertex. Esc to finish.';
     hint.hidden = false;
-  } else hint.hidden = !(latestSurface && latestSurface.structures.length === 0);
+  } else renderSurfaceHint();
 }
 
 function renderMeasurements(list: Measurement[]) {
@@ -470,7 +534,21 @@ function resetForNewModel(keepThreshold = false) {
   $('uyarilar').replaceChildren();
   viewer?.setTool(null);
   viewer?.clearMeasurements();
-  if (!keepThreshold) setThreshold(BONE_RANGE.min, BONE_RANGE.max);
+  if (!keepThreshold) {
+    setThreshold(BONE_RANGE.min, BONE_RANGE.max);
+    filters.shells = filters.fragments = true;
+    $<HTMLInputElement>('filtre-kabuk').checked = true;
+    $<HTMLInputElement>('filtre-parca').checked = true;
+    $<HTMLDetailsElement>('yapilar-bolme').open = false;
+  }
+  syncSeriesBlock();
+}
+
+/** The block only appears when there is a real choice of series or something to warn about. */
+function syncSeriesBlock() {
+  const choice = !$<HTMLSelectElement>('seri').hidden;
+  $('seri-etiket').hidden = !choice;
+  $('seri-bolme').hidden = !choice && !$('uyarilar').childElementCount;
 }
 
 function startMesh(request: MeshRequest, transfer: Transferable[], frame: { rowDir: Vec3; colDir: Vec3 }) {
@@ -519,8 +597,7 @@ async function buildSeries(selected: SeriesInfo, keepThreshold = false) {
   if (!current) return;
   current.selected = selected;
   resetForNewModel(keepThreshold);
-  const usableCount = current.series.filter((s) => s.usable).length;
-  $('seri-bilgi').textContent = usableCount < 2 ? [describeSeries(selected, current.series), selected.description].filter(Boolean).join(' · ') : selected.description;
+  $('seri-bilgi').textContent = current.series.filter((s) => s.usable).length < 2 ? '' : selected.description;
   show('loading');
   setStep(1, `0 / ${num(selected.slices.length)}`, 30);
   try {
@@ -540,6 +617,7 @@ async function buildSeries(selected: SeriesInfo, keepThreshold = false) {
       p.textContent = w;
       box.append(p);
     }
+    syncSeriesBlock();
     if (current.details) {
       $('vaka-rozet').hidden = true;
       const line = caseLine(current.details, formatStudyDate(selected.slices[0].studyDate));
@@ -596,9 +674,10 @@ $<HTMLSelectElement>('seri').addEventListener('change', (e) => {
   if (s) void buildSeries(s, true);
 });
 
-function showExampleChrome(badge: string, line: string, seriesLine: string) {
+function showExampleChrome(badge: string, line: string) {
   $<HTMLSelectElement>('seri').hidden = true;
-  $('seri-bilgi').textContent = seriesLine;
+  $('seri-bilgi').textContent = '';
+  syncSeriesBlock();
   $('depo').hidden = true;
   $('vaka-rozet').textContent = badge;
   $('vaka-rozet').hidden = false;
@@ -617,7 +696,7 @@ async function openDemo(file: string, label: string) {
     const { header, volume } = await fetchDemo(`demo/${file}.vseg`, (share) => setStep(0, `${Math.round(share * 100)}%`, share * 70));
     if (current !== mine) return;
     exampleInfo = { slices: header.nz, cols: header.nx, rows: header.ny, spacing: header.spacingMm.toFixed(1) };
-    showExampleChrome('Demo', `${label} · Real CT · Patient details removed`, `Demo case · ${header.species}`);
+    showExampleChrome('Demo', `${label} · Real CT · Patient details removed`);
     setStep(2, undefined, 85);
     startMesh({ type: 'load', volume }, [volume.data.buffer as ArrayBuffer], { rowDir: volume.rowDir, colDir: volume.colDir });
   } catch (err) {
@@ -631,7 +710,7 @@ async function openSample() {
   show('loading');
   setStep(2, 'Generating', 70);
   exampleInfo = SAMPLE_INFO;
-  showExampleChrome('Sample', 'Generated vertebrae · Not a real patient', 'Generated sample · 0.6 mm');
+  showExampleChrome('Sample', 'Generated vertebrae · Not a real patient');
   startMesh({ type: 'sample' }, [], { rowDir: [1, 0, 0], colDir: [0, -1, 0] });
 }
 

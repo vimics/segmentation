@@ -228,7 +228,20 @@ input[type="checkbox"]:checked::before { background: var(--vurgu-anlamli); }
 .depo-durum .cubuk { margin-top: 2px; }
 .depo-ref { font: 500 12.5px/1.4 var(--mono); color: var(--alt-baslik); word-break: break-all; }
 .yakinda { display: grid; gap: var(--b1); margin: var(--b4) var(--b4) 0; padding: var(--b3) var(--b3) var(--b3) var(--b4); background: var(--zemin-yukseltilmis); border: 1px solid var(--kenarlik); border-left: 3px solid var(--vurgu); border-radius: var(--r2); font-size: 13.5px; line-height: 1.45; }
-.yapilar { max-height: 216px; overflow-y: auto; }
+/* Seven rows of 32 px, then it scrolls. */
+.yapilar { max-height: 224px; overflow-y: auto; margin-top: var(--b3); }
+
+/* Filters */
+.filtre-not { font-size: 12px; line-height: 1.45; font-weight: 300; color: var(--metin-ikincil); }
+.filtre-liste { display: grid; }
+.filtre { display: grid; grid-template-columns: 16px minmax(0, 1fr); align-items: center; gap: var(--b2); min-height: 32px; font-size: 14px; cursor: pointer; }
+
+/* A section that opens on click */
+.acilir { display: block; }
+.acilir summary { display: flex; justify-content: space-between; align-items: baseline; gap: var(--b2); cursor: pointer; list-style: none; }
+.acilir summary::-webkit-details-marker { display: none; }
+.acilir summary .etiket::after { content: ' ▸'; }
+.acilir[open] summary .etiket::after { content: ' ▾'; }
 
 /* Small screens */
 @media (max-width: 860px) {

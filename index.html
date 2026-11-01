@@ -125,8 +125,8 @@
       <p>A neural network bone segmentation engine is in training at Vimics HQ, will be available at vimics.vet/segmentation, at no charge.</p>
     </aside>
 
-    <section class="bolme">
-      <p class="etiket">Series</p>
+    <section class="bolme" id="seri-bolme" hidden>
+      <p class="etiket" id="seri-etiket">Series</p>
       <select class="secim" id="seri" aria-label="CT series" hidden></select>
       <p class="seri-bilgi" id="seri-bilgi"></p>
       <div id="uyarilar" style="display: grid; gap: 8px;"></div>
@@ -149,12 +149,13 @@
       <p class="esik-not" id="esik-not">We normally expect cortical and cancellous bones between 226 - 1988 Hounsfield units, but shifts can occur due to the calibration, tube voltage and reconstruction filters. Use threshold slider to adjust for shifts and eliminate noise.</p>
     </section>
 
-    <section class="bolme">
-      <div class="bolme-bas">
-        <p class="etiket">Structures</p>
-        <span class="bolme-not" id="temizlik"></span>
+    <section class="bolme" id="filtreler">
+      <p class="etiket">Filters</p>
+      <p class="filtre-not" id="filtre-not" hidden></p>
+      <div class="filtre-liste">
+        <label class="filtre"><input type="checkbox" id="filtre-kabuk" checked><span>Small shells (&lt;8 mm³)</span></label>
+        <label class="filtre"><input type="checkbox" id="filtre-parca" checked><span>Thin fragments</span></label>
       </div>
-      <ul class="yapilar" id="yapilar"></ul>
     </section>
 
     <section class="bolme">
@@ -184,6 +185,11 @@
         <button class="btn btn-ikincil" id="depo-tekrar" type="button" hidden>Retry</button>
       </div>
     </section>
+
+    <details class="bolme acilir" id="yapilar-bolme">
+      <summary><span class="etiket">Structures</span><span class="bolme-not" id="yapilar-not" hidden>Largest 50</span></summary>
+      <ul class="yapilar" id="yapilar"></ul>
+    </details>
 
   </aside>
 

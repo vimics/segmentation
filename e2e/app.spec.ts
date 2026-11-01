@@ -29,7 +29,10 @@ async function open(page: Page, files: FileInput[], opts: { breed?: string; clin
   await page.click('#basla');
 }
 
-const waitForModel = (page: Page) => page.locator('#iyilestir').and(page.locator('[hidden]')).waitFor({ state: 'attached', timeout: 60_000 }).then(() => page.locator('#yapilar li').first().waitFor());
+const waitForModel = async (page: Page) => {
+  await page.locator('#ozet', { hasText: 'triangles' }).waitFor({ timeout: 60_000 });
+  await page.locator('#iyilestir').waitFor({ state: 'hidden', timeout: 60_000 });
+};
 
 function collectProblems(page: Page) {
   const problems: string[] = [];
@@ -106,12 +109,12 @@ test.describe('viewer', () => {
     await expect(page.locator('#yapilar li')).toHaveCount(1);
     await expect(page.locator('.yakinda')).toContainText('A neural network bone segmentation engine is in training at Vimics HQ, will be available at vimics.vet/segmentation, at no charge.');
     await expect(page.locator('.urun-ad')).toHaveText('V-Seg Engine v1.0');
-    await expect(page.locator('.ray .etiket')).toHaveText(['Coming soon', 'Series', 'Threshold', 'Structures', 'Measure', 'Clip', 'Case storage']);
+    await expect(page.locator('.ray .etiket:visible')).toHaveText(['Coming soon', 'Threshold', 'Filters', 'Measure', 'Clip', 'Case storage', 'Structures']);
     await expect(page.locator('.ray > *').first()).toHaveClass('yakinda');
     await expect(page.locator('.kup button').first()).toHaveText('Z');
     await expect(page.locator('body')).not.toContainText('Verify left and right');
     await expect(page.locator('#ozet')).toContainText('64');
-    const volume = parseFloat(await page.locator('#yapilar .hacim').first().innerText());
+    const volume = parseFloat(await page.locator('#yapilar .hacim').first().textContent() ?? '');
     const expected = (4 / 3) * Math.PI * 12 ** 3 / 1000;
     expect(Math.abs(volume - expected) / expected).toBeLessThan(0.05);
 
@@ -138,9 +141,9 @@ test.describe('viewer', () => {
     await page.goto('/');
     await page.click('#ornek');
     await waitForModel(page);
-    await expect(page.locator('#yapilar li')).toHaveCount(4);
-    await expect(page.locator('#yapilar li').last()).toContainText('Likely scanner table');
-    await expect(page.locator('#yapilar li').last().locator('input')).not.toBeChecked();
+    await expect(page.locator('#yapilar li')).toHaveCount(3);
+    await expect(page.locator('#yapilar')).not.toContainText('Likely scanner table');
+    await expect(page.locator('#filtre-not')).toContainText('thin fragment');
     await expect(page.locator('#depo')).toBeHidden();
 
     const tris = () => page.locator('#ozet').innerText();
@@ -166,7 +169,7 @@ test.describe('viewer', () => {
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     await expect(page.locator('#aksiyon')).toBeVisible();
     await page.click('#aksiyon-gizle');
-    await expect(page.locator('#yapilar input:not(:checked)')).toHaveCount(2);
+    await expect(page.locator('#yapilar input:not(:checked)')).toHaveCount(1);
 
     const [download] = await Promise.all([page.waitForEvent('download'), page.click('#goruntu')]);
     expect(download.suggestedFilename()).toBe('vimics-v-seg.png');
@@ -180,7 +183,7 @@ test.describe('file formats in real workers, under the production security polic
       await fakeStorage(page);
       await open(page, sphereFiles(syntax));
       await waitForModel(page);
-      const volume = parseFloat(await page.locator('#yapilar .hacim').first().innerText());
+      const volume = parseFloat(await page.locator('#yapilar .hacim').first().textContent() ?? '');
       expect(Math.abs(volume - 7.24) / 7.24).toBeLessThan(0.06);
       expect(problems).toEqual([]);
     });
@@ -209,7 +212,7 @@ test.describe('file formats in real workers, under the production security polic
       await fakeStorage(page);
       await open(page, await wasmEncoded(kind));
       await waitForModel(page);
-      const volume = parseFloat(await page.locator('#yapilar .hacim').first().innerText());
+      const volume = parseFloat(await page.locator('#yapilar .hacim').first().textContent() ?? '');
       expect(Math.abs(volume - 7.24) / 7.24).toBeLessThan(0.06);
       expect(problems).toEqual([]);
     });
@@ -259,8 +262,7 @@ test.describe('file formats in real workers, under the production security polic
     const dose = { ...main[0], seriesUid: '1.2.3.3', samples: 3, instance: 901 };
     await open(page, asFiles([scout, dose, ...main]));
     await waitForModel(page);
-    await expect(page.locator('#seri')).toBeHidden();
-    await expect(page.locator('#seri-bilgi')).toHaveText('Bone filter (B70f) · Full scan · 0.5 mm · 64 slices · Spine');
+    await expect(page.locator('#seri-bolme')).toBeHidden();
   });
 
   test('a real-world mix loads: DICOM with BMP copies, a viewer program and a readme', async ({ page }) => {
@@ -307,9 +309,10 @@ test.describe('demo cases', () => {
       page.on('request', (r) => { if (!r.url().startsWith('http://localhost') && !r.url().startsWith('blob:') && !r.url().startsWith('data:')) outgoing.push(r.url()); });
       await page.goto('/');
       await page.getByRole('button', { name, exact: true }).click();
-      await page.locator('#yapilar li').first().waitFor({ timeout: 85_000 });
+      await page.locator('#ozet', { hasText: 'triangles' }).waitFor({ timeout: 85_000 });
       await expect(page.locator('#vaka')).toContainText('Patient details removed');
-      await expect(page.locator('#seri-bilgi')).toHaveText(`Demo case · ${species}`);
+      await expect(page.locator('#seri-bolme')).toBeHidden();
+      await expect(page.locator('#vaka')).toContainText(species === 'Cat' ? 'Cat' : 'Dog');
       await expect(page.locator('#esik-sayi-min')).toHaveValue('226');
       await expect(page.locator('#esik-sayi-max')).toHaveValue('1988');
       await expect(page.locator('#depo')).toBeHidden();
@@ -364,6 +367,160 @@ test.describe('threshold selector', () => {
     await page.fill('#esik-sayi-max', '600');
     await page.press('#esik-sayi-max', 'Enter');
     await expect.poll(() => page.locator('#ozet').innerText(), { timeout: 30_000 }).not.toBe(before);
+  });
+});
+
+test.describe('filters and structures', () => {
+  /** A big sphere plus tiny ones under 8 mm³, so the small shells filter has something to do. */
+  const withShells = () => asFiles(spherePhantom({ radiusMm: 12 }).slices.map((s) => ({
+    ...s,
+    hu: (i: number, j: number) => {
+      const z = s.position[2], tiny = [[2, 2], [4, 2], [6, 2]].some(([a, b]) => Math.hypot(i * 0.5 - a, j * 0.5 - b, z - 16) < 0.8);
+      return tiny ? 1000 : s.hu(i, j);
+    },
+  })));
+  const triangles = async (page: Page) => parseInt((await page.locator('#ozet').innerText()).split('·').pop()!.replace(/\D/g, ''), 10);
+
+  test('both filters start on, and the note follows the ticks', async ({ page }) => {
+    await page.goto('/');
+    await page.click('#ornek');
+    await waitForModel(page);
+    await expect(page.locator('#filtreler .filtre')).toHaveText(['Small shells (<8 mm³)', 'Thin fragments']);
+    await expect(page.locator('#filtre-kabuk')).toBeChecked();
+    await expect(page.locator('#filtre-parca')).toBeChecked();
+    await expect(page.locator('#filtre-not')).toContainText('removed.');
+    await expect(page.locator('.bolme-not', { hasText: 'specks' })).toHaveCount(0);
+
+    // Off: the table comes back at once, and joins the list.
+    const before = await triangles(page);
+    await page.uncheck('#filtre-parca');
+    expect(await triangles(page)).toBeGreaterThan(before);
+    await expect(page.locator('#yapilar')).toContainText('Likely scanner table');
+    await page.check('#filtre-parca');
+    expect(await triangles(page)).toBe(before);
+    await expect(page.locator('#yapilar')).not.toContainText('Likely scanner table');
+  });
+
+  test('small shells are counted, built when asked for and hidden again without a rebuild', async ({ page }) => {
+    await fakeStorage(page);
+    await open(page, withShells());
+    await waitForModel(page);
+    await expect(page.locator('#filtre-not')).toHaveText('3 small shells removed.');
+    const before = await triangles(page);
+
+    await page.uncheck('#filtre-kabuk');
+    await expect(page.locator('#filtre-not')).toBeHidden();
+    await expect.poll(() => triangles(page), { timeout: 30_000 }).toBeGreaterThan(before);
+    await waitForModel(page);
+    await expect(page.locator('#yapilar li')).toHaveCount(1);
+
+    await page.check('#filtre-kabuk');
+    await expect(page.locator('#filtre-not')).toHaveText('3 small shells removed.');
+    expect(await triangles(page)).toBe(before);
+  });
+
+  test('the choice survives a threshold change and resets for a new case', async ({ page }) => {
+    await page.goto('/');
+    await page.click('#ornek');
+    await waitForModel(page);
+    await page.uncheck('#filtre-parca');
+    await page.fill('#esik-sayi-min', '400');
+    await page.press('#esik-sayi-min', 'Enter');
+    await waitForModel(page);
+    await expect(page.locator('#filtre-parca')).not.toBeChecked();
+    await page.click('#yeni-vaka');
+    await page.click('#ornek');
+    await waitForModel(page);
+    await expect(page.locator('#filtre-parca')).toBeChecked();
+    await expect(page.locator('#yapilar-bolme')).not.toHaveAttribute('open');
+  });
+
+  test('says so when the filters hide everything', async ({ page }) => {
+    await fakeStorage(page);
+    // A thin curved shell alone: everything in it counts as a thin fragment.
+    const shell = spherePhantom({ radiusMm: 12, size: 64, count: 64 }).slices.map((s) => ({
+      ...s,
+      hu: (i: number, j: number) => { const d = Math.hypot(i * 0.5 - 16, j * 0.5 - 16, s.position[2] - 16); return d > 10 && d < 10.5 ? 1000 : -1000; },
+    }));
+    await open(page, asFiles(shell));
+    await page.locator('#ozet', { hasText: 'triangles' }).waitFor({ timeout: 60_000 });
+    await expect(page.locator('#ipucu')).toContainText('Everything here is filtered');
+    await page.uncheck('#filtre-parca');
+    await expect(page.locator('#ipucu')).toBeHidden();
+  });
+
+  test('structures stay closed until clicked, and show seven rows at a time', async ({ page }) => {
+    await fakeStorage(page);
+    // Eight spheres in a row: more pieces than the seven rows show.
+    const spheres = spherePhantom({ radiusMm: 12, size: 96, count: 16 }).slices.map((s) => ({
+      ...s,
+      hu: (i: number, j: number) => {
+        for (let c = 0; c < 8; c++) if (Math.hypot(i * 0.5 - (3 + c * 5.5), j * 0.5 - 12, s.position[2] - 4) < 2) return 1000;
+        return -1000;
+      },
+    }));
+    await open(page, asFiles(spheres));
+    await waitForModel(page);
+    await expect(page.locator('#yapilar li').first()).toBeHidden();
+    await expect(page.locator('#yapilar-not')).toBeHidden();
+    await page.locator('#yapilar-bolme summary').scrollIntoViewIfNeeded();
+    await page.click('#yapilar-bolme summary');
+    await expect(page.locator('#yapilar li')).toHaveCount(8);
+    const { view, row, scroll } = await page.locator('#yapilar').evaluate((el) => ({ view: el.clientHeight, row: el.children[0].getBoundingClientRect().height, scroll: el.scrollHeight }));
+    expect(Math.round(view / row)).toBe(7);
+    expect(scroll).toBeGreaterThan(view);
+    await page.click('#yapilar-bolme summary');
+    await expect(page.locator('#yapilar li').first()).toBeHidden();
+  });
+
+  test('more than fifty pieces lists the largest fifty', async ({ page }) => {
+    await fakeStorage(page);
+    const grid = spherePhantom({ radiusMm: 12, size: 96, count: 16 }).slices.map((s) => ({
+      ...s,
+      hu: (i: number, j: number) => {
+        const ci = Math.round((i * 0.5 - 4) / 5), cj = Math.round((j * 0.5 - 4) / 5);
+        if (ci < 0 || ci > 7 || cj < 0 || cj > 7) return -1000;
+        return Math.hypot(i * 0.5 - (4 + ci * 5), j * 0.5 - (4 + cj * 5), s.position[2] - 4) < 2 ? 1000 : -1000;
+      },
+    }));
+    await open(page, asFiles(grid));
+    await waitForModel(page);
+    await expect(page.locator('#yapilar li')).toHaveCount(50);
+    await page.locator('#yapilar-bolme summary').scrollIntoViewIfNeeded();
+    await expect(page.locator('#yapilar-not')).toHaveText('Largest 50');
+  });
+
+  test('a piece hidden by clicking the model comes back from the list', async ({ page }) => {
+    await page.goto('/');
+    await page.click('#ornek');
+    await waitForModel(page);
+    const before = await triangles(page);
+    const box = (await page.locator('#tuval').boundingBox())!;
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await expect(page.locator('#aksiyon')).toBeVisible();
+    await page.click('#aksiyon-gizle');
+    expect(await triangles(page)).toBeLessThan(before);
+    await page.locator('#yapilar-bolme summary').scrollIntoViewIfNeeded();
+    await page.click('#yapilar-bolme summary');
+    await page.locator('#yapilar input:not(:checked)').click();
+    await expect.poll(() => triangles(page)).toBe(before);
+  });
+
+  test('a choice of series keeps its dropdown and warnings stay without the label', async ({ page }) => {
+    await fakeStorage(page);
+    const a = spherePhantom({ radiusMm: 12, count: 64 }).slices.map((s) => ({ ...s, seriesUid: '1.2.3.1' }));
+    const b = spherePhantom({ radiusMm: 6, size: 32, count: 32 }).slices.map((s) => ({ ...s, seriesUid: '1.2.3.2', instance: s.instance + 1000 }));
+    await open(page, asFiles([...a, ...b]));
+    await waitForModel(page);
+    await expect(page.locator('#seri-etiket')).toBeVisible();
+    await expect(page.locator('#seri')).toBeVisible();
+
+    const { slices } = spherePhantom({ radiusMm: 12 });
+    await open(page, asFiles(slices.filter((s) => s.instance !== 20)));
+    await waitForModel(page);
+    await expect(page.locator('#uyarilar')).toContainText('1 slice is missing');
+    await expect(page.locator('#seri-etiket')).toBeHidden();
+    await expect(page.locator('#seri')).toBeHidden();
   });
 });
 

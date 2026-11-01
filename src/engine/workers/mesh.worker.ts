@@ -6,7 +6,7 @@ import type { SurfaceResult, Volume } from '../types';
 export type MeshRequest =
   | { type: 'load'; volume: Volume }
   | { type: 'sample' }
-  | { type: 'extract'; seq: number; range: HuRange; quality: 'preview' | 'full' };
+  | { type: 'extract'; seq: number; range: HuRange; keepShells: boolean; quality: 'preview' | 'full' };
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 let engine: SurfaceEngine | null = null;
@@ -21,7 +21,7 @@ function pump() {
   if (!job || !engine) return;
   try {
     const started = performance.now();
-    const result = job.quality === 'preview' ? engine.preview(job.range) : engine.full(job.range);
+    const result = job.quality === 'preview' ? engine.preview(job.range, job.keepShells) : engine.full(job.range, job.keepShells);
     postResult(job.seq, result, performance.now() - started);
   } catch (err) {
     scope.postMessage({ type: 'error', seq: job.seq, message: err instanceof Error ? err.message : String(err) });
