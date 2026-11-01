@@ -3,6 +3,8 @@ import { TrackballControls } from 'three/addons/controls/TrackballControls.js';
 import type { StructureMesh, SurfaceResult, Vec3 } from '../types';
 import { faceOn, poseOf, rolledUp, squaredUp, upFacing } from './orientation';
 
+const WEB_ICON = 'M8 1a7 7 0 1 0 0 14a7 7 0 0 0 0-14z M1 8h14 M8 1c2.2 2 3.2 4.4 3.2 7s-1 5-3.2 7 M8 1c-2.2 2-3.2 4.4-3.2 7s1 5 3.2 7';
+const INSTAGRAM_ICON = 'M5 1.2h6a3.8 3.8 0 0 1 3.8 3.8v6a3.8 3.8 0 0 1-3.8 3.8H5A3.8 3.8 0 0 1 1.2 11V5A3.8 3.8 0 0 1 5 1.2z M8 4.6a3.4 3.4 0 1 0 0 6.8a3.4 3.4 0 0 0 0-6.8z';
 const IVORY = 0xf6ecd6, CAP = 0xcdbb99, HIGHLIGHT = 0x4cb088;
 const FACES: Record<string, Vec3> = { z: [0, 0, 1], '-z': [0, 0, -1], x: [1, 0, 0], '-x': [-1, 0, 0], y: [0, 1, 0], '-y': [0, -1, 0] };
 
@@ -605,14 +607,15 @@ export class Viewer {
     const x = 24 * ratio, y = h - 22 * ratio;
     ctx.font = `${12 * ratio}px "IBM Plex Mono", monospace`;
 
-    // The case details sit beside the scale bar, shortened if the image is too narrow for them.
-    const captionX = x + scale * pxPerMm + 16 * ratio, room = w - captionX - 24 * ratio;
+    const labelEnd = Math.max(x + scale * pxPerMm, x + ctx.measureText(`${scale} mm`).width);
+    frost(x - 12 * ratio, y - 29 * ratio, labelEnd - x + 24 * ratio, 39 * ratio);
+
+    // The case details get their own panel on the right, shortened if the image is too narrow for them.
+    const captionEnd = w - 24 * ratio, room = captionEnd - (labelEnd + 36 * ratio);
     let text = caption;
     while (text && ctx.measureText(text).width > room) text = text.slice(0, -2).trimEnd() + '…';
     if (text.length < 2) text = '';
-    const labelEnd = Math.max(x + scale * pxPerMm, x + ctx.measureText(`${scale} mm`).width);
-    const panelEnd = text ? captionX + ctx.measureText(text).width : labelEnd;
-    frost(x - 12 * ratio, y - 29 * ratio, panelEnd - x + 24 * ratio, 39 * ratio);
+    if (text) frost(captionEnd - ctx.measureText(text).width - 12 * ratio, y - 16 * ratio, ctx.measureText(text).width + 24 * ratio, 26 * ratio);
 
     ctx.strokeStyle = ink;
     ctx.fillStyle = ink;
@@ -624,18 +627,41 @@ export class Viewer {
     ctx.lineTo(x + scale * pxPerMm, y);
     ctx.lineTo(x + scale * pxPerMm, y - 6 * ratio);
     ctx.stroke();
-    if (text) ctx.fillText(text, captionX, y);
+    if (text) {
+      ctx.textAlign = 'right';
+      ctx.fillText(text, captionEnd, y + ratio);
+      ctx.textAlign = 'left';
+    }
 
     const img = new Image();
     await new Promise((res) => { img.onload = res; img.onerror = res; img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(logoMarkup)}`; });
     if (img.width) {
       const lh = 34 * ratio, lw = lh * (2000 / 362), lx = w - lw - 24 * ratio, ly = 22 * ratio;
-      frost(lx - 12 * ratio, ly - 10 * ratio, lw + 24 * ratio, lh + 36 * ratio);
+      frost(lx - 12 * ratio, ly - 10 * ratio, lw + 24 * ratio, lh + 55 * ratio);
       ctx.drawImage(img, lx, ly, lw, lh);
       ctx.fillStyle = ink;
-      ctx.textAlign = 'right';
-      ctx.fillText('vimics.vet', lx + lw, ly + lh + 16 * ratio);
-      ctx.textAlign = 'left';
+
+      /** One centred row under the logo: an icon drawn on a 16-unit grid, then its label. */
+      const row = (icon: (c: CanvasRenderingContext2D) => void, label: string, baseline: number) => {
+        const size = 12 * ratio, gap = 5 * ratio;
+        const start = lx + (lw - size - gap - ctx.measureText(label).width) / 2;
+        ctx.save();
+        ctx.translate(start, baseline - 10 * ratio);
+        ctx.scale(size / 16, size / 16);
+        ctx.strokeStyle = ink;
+        ctx.fillStyle = ink;
+        ctx.lineWidth = 1.3;
+        icon(ctx);
+        ctx.restore();
+        ctx.fillText(label, start + size + gap, baseline);
+      };
+      row((c) => c.stroke(new Path2D(WEB_ICON)), 'vimics.vet', ly + lh + 17 * ratio);
+      row((c) => {
+        c.stroke(new Path2D(INSTAGRAM_ICON));
+        c.beginPath();
+        c.arc(11.7, 4.3, 0.9, 0, Math.PI * 2);
+        c.fill();
+      }, '@vimicsveterinary', ly + lh + 35 * ratio);
     }
     return new Promise((resolve, reject) => out.toBlob((b) => (b ? resolve(b) : reject(new Error('Snapshot failed'))), 'image/png'));
   }

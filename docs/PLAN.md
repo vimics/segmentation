@@ -13,7 +13,7 @@ A free web tool: a vet enters patient details, drops a CT series, and gets a 3D 
 | Processing | The 3D model is built in the browser. Upload runs in the background and never blocks the viewer |
 | Hosting | Public GitHub repo with GitHub Pages, ending at `vimics.vet/segmentation/`. See `GO-LIVE.md` |
 | Upload service | Cloudflare Worker holds the SharePoint credentials and issues one-time upload links. Vets never sign in |
-| Output | No STL or mesh export. PNG snapshot with the Vimics logo, vimics.vet and the case details beside the scale bar |
+| Output | No STL or mesh export. PNG snapshot with the Vimics logo, vimics.vet and @vimicsveterinary at top right, the scale bar at bottom left and the case details at bottom right |
 | Engine | Online3DViewer is a design reference, not a dependency. three.js, on-demand rendering, plain DOM and TypeScript |
 | Language | English, with all strings in one file |
 

@@ -180,6 +180,7 @@ test.describe('viewer', () => {
     const [download] = await Promise.all([page.waitForEvent('download'), page.click('#goruntu')]);
     const drawn = await page.evaluate(() => (window as unknown as { drawn: string[] }).drawn);
     expect(drawn).toContain('vimics.vet');
+    expect(drawn).toContain('@vimicsveterinary');
     expect(drawn.some((t) => t.startsWith('Generated vertebrae'))).toBe(true);
     expect(download.suggestedFilename()).toBe('vimics-v-seg.png');
   });
