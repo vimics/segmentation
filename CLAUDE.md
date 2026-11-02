@@ -21,16 +21,15 @@ Umut and Onur build this by working with AI agents. Explain what you change in p
 Umut and Onur both push to `main`, often at the same time.
 
 1. At the start of a session, run `git fetch origin && git status -sb` and tell the person if they are behind or have uncommitted work.
-2. Push only when the person you're working with says so.
-3. Before pushing, always:
+2. Push finished work without asking. Before pushing, always:
    ```sh
    git pull --rebase origin main
    npm test && npm run build
    git push origin main
    ```
-4. If the push is rejected, pull again with `--rebase`. Never use `--force`, and never change commits that are already pushed.
-5. Work that takes more than a day goes on a branch, `umut/<topic>` or `onur/<topic>`, and joins `main` when finished.
-6. After pushing, check the deploy with `gh run list --workflow Deploy --limit 1`, then open the live page.
+3. If the push is rejected, pull again with `--rebase`. Never use `--force`, and never change commits that are already pushed.
+4. Work that takes more than a day goes on a branch, `umut/<topic>` or `onur/<topic>`, and joins `main` when finished.
+5. After pushing, check the deploy with `gh run list --workflow Deploy --limit 1`, then open the live page.
 
 ## Commands
 
