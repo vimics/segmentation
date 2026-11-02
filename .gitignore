@@ -10,3 +10,4 @@ playwright-report/
 .dev.vars
 *.log
 dist-e2e/
+.claude/settings.local.json
