@@ -4,7 +4,7 @@ compatibility_date = "2026-10-01"
 
 [vars]
 # The sites allowed to send cases, comma separated.
-ALLOWED_ORIGINS = "https://umuttutal.github.io,https://vimics.vet"
+ALLOWED_ORIGINS = "https://vimics.vet"
 ROOT_FOLDER = "V-Seg"
 MAX_CASES_PER_HOUR = "30"
 

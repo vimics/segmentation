@@ -117,7 +117,6 @@ Then, technically:
 - [ ] Add bot protection: Cloudflare Turnstile, using `TURNSTILE_SECRET` and `VITE_TURNSTILE_SITE_KEY`
 - [ ] Add a Cloudflare rate limit rule, because the Worker's own limit is only per instance
 - [ ] Delete the `ACCESS_CODE` secret
-- [ ] Remove `https://umuttutal.github.io` from `ALLOWED_ORIGINS` in `worker/wrangler.toml`
 - [ ] Try it once on a typical clinic laptop, and once each in Safari and on Windows
 
 ---

@@ -96,7 +96,6 @@ The browser first uploads straight to SharePoint and, if the browser blocks that
 - [ ] Decide how long data is kept, then state it in `privacy.html`
 - [ ] Decide who handles deletion requests, which arrive at info@vimics.vet with a case reference
 - [ ] Remove `ACCESS_CODE` with `npx wrangler secret delete ACCESS_CODE`
-- [ ] Remove `https://umuttutal.github.io` from `ALLOWED_ORIGINS`
 - [ ] Add bot protection: create a Cloudflare Turnstile widget, set the `TURNSTILE_SECRET` Worker secret and the `VITE_TURNSTILE_SITE_KEY` GitHub variable
 - [ ] Add a Cloudflare rate limiting rule, since the Worker's built-in limit is per instance
 - [ ] Check SharePoint storage quota against expected volume: the two largest real cases sent 193 and 304 MB

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import service, { validateCase, isAllowedUploadUrl, type Env } from '../worker/src/index';
 
-const ORIGIN = 'https://umuttutal.github.io';
-const env: Env = { TENANT_ID: 't', CLIENT_ID: 'c', CLIENT_SECRET: 'SECRET', DRIVE_ID: 'drive1', ALLOWED_ORIGINS: `${ORIGIN},https://vimics.vet`, MAX_CASES_PER_HOUR: '1000' };
+const ORIGIN = 'https://vimics.vet';
+const env: Env = { TENANT_ID: 't', CLIENT_ID: 'c', CLIENT_SECRET: 'SECRET', DRIVE_ID: 'drive1', ALLOWED_ORIGINS: ORIGIN, MAX_CASES_PER_HOUR: '1000' };
 
 const validCase = () => ({
   schema: 1,
