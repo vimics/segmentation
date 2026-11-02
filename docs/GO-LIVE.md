@@ -4,12 +4,12 @@ For Umut and Onur. Follow it top to bottom. Each step says who does it and how t
 
 ## The short version
 
-1. **The website is already on GitHub.** vimics.vet is served by GitHub Pages from the repository `vimics/vimics`, and the domain is registered through GoDaddy. So V-Seg can go on the same site without changing hosting.
+1. **The website is already on GitHub.** vimics.vet is served by GitHub Pages from the repository `vimics/vimics.github.io`, and the domain is registered through GoDaddy. So V-Seg can go on the same site without changing hosting.
 2. **V-Seg needs no server.** It's a folder of static files. The 3D model is built on the vet's computer.
 3. **SharePoint needs one small helper.** A public web page can't hold a SharePoint password, so a small Cloudflare service holds it and hands the browser a one-time upload link.
 4. **Do it in this order:** put the tool online unlisted, connect SharePoint and test it with a private code, complete the legal review, then link it from the menu.
 
-Most of the steps need Onur, because Umut's GitHub login can only read `vimics/vimics`.
+Umut can push to both repositories, but repository settings, such as Pages, need Onur.
 
 ## How it fits together
 
@@ -36,8 +36,8 @@ V-Seg/2026/11/VS-20261103-3FA91C07D2/
 
 | Piece | What it is | Who owns it |
 |---|---|---|
-| `vimics/vimics` | The website | Onur |
-| `v-seg` repository | The tool | Moves to the `vimics` account in Step 2 |
+| `vimics/vimics.github.io` | The website | Onur |
+| `vimics/segmentation` | The tool | Onur, shared with Umut |
 | Cloudflare Worker | The helper holding the SharePoint login | A Vimics Cloudflare account |
 | SharePoint site | Where the scans are stored | The Vimics Microsoft 365 administrator |
 
@@ -45,41 +45,23 @@ V-Seg/2026/11/VS-20261103-3FA91C07D2/
 
 ## Part 1: Put the tool on the site
 
-Result: the tool is live at `vimics.vet/segmentation/`, not linked from anywhere yet. Allow 30 minutes.
+Result: the tool is live at `vimics.vet/segmentation/`, not linked from anywhere yet.
 
-**Why these steps:** GitHub only serves other repositories under your domain when the main site lives in a repository named `<account>.github.io`. Yours is named `vimics`, so it's treated as a single separate site. Renaming it means V-Seg gets its own repository and its own updates, and the website isn't touched.
+**Done on 2026-11-02:**
 
-### Step 1: Rename the website repository (Onur)
+- The website repository is renamed to `vimics.github.io`. vimics.vet, its sitemap pages and `/dicom/` still work.
+- V-Seg's code is in `vimics/segmentation`, and Umut can push to it and to the website repository.
+- A private copy of the earlier repository is kept at `umuttutal/v-seg-legacy`.
 
-Do this at a quiet time.
-
-1. In `vimics/vimics`, open **Settings** and rename the repository to `vimics.github.io`.
-2. Open **Settings → Pages** and confirm the custom domain still says `vimics.vet`.
-3. **Check:** open `vimics.vet`, a blog page and `vimics.vet/dicom/`. All should work. Allow a few minutes.
-
-**If anything looks wrong:** rename it back to `vimics`. Nothing else has changed at this point.
-
-I've confirmed this behaviour from GitHub's documentation, not by doing it, so it's worth watching this first step.
-
-### Step 2: Move V-Seg to the `vimics` account (Umut, then Onur)
-
-1. In `umuttutal/v-seg`, go to **Settings → General → Transfer ownership**, and transfer it to `vimics`.
-2. Onur accepts the email from GitHub.
-3. Onur renames the repository to `segmentation`. The address comes from this name.
-4. Onur gives Umut write access under **Settings → Collaborators**.
-5. Umut updates their copy: `git remote set-url origin git@github.com:vimics/segmentation.git`
-
-### Step 3: Turn on publishing (Onur)
+**Left for Onur:** only he can change repository settings.
 
 1. In `vimics/segmentation`, open **Settings → Pages** and set **Source** to **GitHub Actions**.
-2. Open **Actions → Deploy → Run workflow**.
-3. **Check:** when it's green, open `https://vimics.vet/segmentation/`. Open a demo case and confirm it rotates.
+2. Open **Actions → Deploy → Run workflow** on `main`.
+3. **Check:** open `https://vimics.vet/segmentation/`, open a demo case and confirm it rotates.
 
-The old address, `umuttutal.github.io/v-seg`, stops working after the move. From now on, every push to `main` tests and publishes the tool.
+From then on, every push to `main` tests and publishes the tool. Don't add a `CNAME` file to this repository: the address comes from the website's domain.
 
-### If you'd rather not rename anything
-
-You can copy the build into a `segmentation/` folder in the website repository instead. It's simpler on day one, but every tool update means copying files again, and the 229 MB of demo files go into the website's history. I recommend the rename.
+**Why it's set up this way:** GitHub serves other repositories under your domain only when the main site lives in a repository named `<account>.github.io`. With that name, V-Seg keeps its own repository and its own updates, and the website isn't touched.
 
 ---
 

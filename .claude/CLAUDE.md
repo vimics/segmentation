@@ -1,6 +1,6 @@
 # vimics/segmentation: vimics.vet/segmentation, Claude ve ekip kuralları
 
-Bu repo **https://vimics.vet/segmentation/** adresinde yayınlanır (GitHub Pages, `main` / kök). `main`'e giren her commit birkaç dakika içinde canlıya çıkar.
+Bu repo **https://vimics.vet/segmentation/** adresinde yayınlanır (GitHub Pages, `main`'den GitHub Actions ile). `main`'e giren her commit birkaç dakika içinde canlıya çıkar.
 Ortak çalışanlar: Onur Demirak (`vimics` hesabı, repo sahibi) ve Umut Tutal (`umuttutal`). İkisi de `main`'e doğrudan push eder. Bu yüzden aşağıdaki kurallar conflict'i ve kaybı önlemek için zorunludur.
 
 > Repo public. `.claude/` ve `.github/` gibi noktayla başlayan klasörler ve `_` ile başlayan klasörler sitede yayınlanmaz, ama GitHub'da herkes okuyabilir. Fiyat, maliyet, müşteri/hasta verisi, iş birliği ya da iç not koyma. **Gerçek hasta CT/DICOM verisi bu repoya asla girmez** (test için anonimleştirilmiş, izinli veri bile repoya değil, harici depolamaya).
@@ -24,6 +24,8 @@ Tek seferlik ayar (her iki bilgisayarda): `git config pull.rebase true` ve `git 
 5. **Birkaç günlük ya da yarım kalabilecek işler dalda yapılır:** `git switch -c umut/<konu>` ya da `onur/<konu>`. Dal `git rebase origin/main` ile güncel tutulur, bitince `main`'e birleştirilip silinir. Yarım iş `main`'e girmez, çünkü `main` canlıdır.
 6. **Üretilen dosyalar** (ileride bir build adımı eklenirse çıktıları): conflict'i elle çözme. Kaynağı çöz, yeniden üret, öyle commit'le. Build adımı eklendiğinde komutu ve üretilen dosya listesini bu dosyaya yaz.
 
+   **Build (V-Seg):** Kaynak Vite ile derlenir. `main`'e her push'ta `.github/workflows/deploy.yml` birim testlerini çalıştırır, `npm run build` ile `dist/` klasörünü üretir ve Pages'e yayınlar (Pages kaynağı: GitHub Actions). Üretilen dosyalar (`dist/`, `dist-e2e/`) repoya girmez. Push öncesi yerelde `npm test` ve `npm run build` çalıştır. Projenin kendi kuralları kökteki `CLAUDE.md` dosyasında.
+
 **Yasaklar:**
 - `main`'e `git push --force` / `--force-with-lease`: yasak.
 - Push edilmiş commit'i değiştirmek (`commit --amend`, `rebase -i`, `reset --hard` + push): yasak.
@@ -37,7 +39,7 @@ Tek seferlik ayar (her iki bilgisayarda): `git config pull.rebase true` ve `git 
 - **`git push` yalnız oturumu kullanan kişi açıkça "push et" dediğinde yapılır.** Commit serbest, push değil.
 - Push'tan sonra Pages derlemesini bekle ve canlı adresi kontrol et:
   ```zsh
-  gh api repos/vimics/segmentation/pages/builds/latest --jq '.status+" "+.commit[0:7]'   # "built <commit>"
+  gh run list --repo vimics/segmentation --workflow Deploy --limit 1 --json headSha,conclusion --jq '.[0].headSha[0:7]+" "+.[0].conclusion'   # "<commit> success"
   curl -s -o /dev/null -w '%{http_code}\n' https://vimics.vet/segmentation/
   ```
 - Force push, history yeniden yazma, dal silme, repo/Pages ayarı değiştirme: kullanıcı açıkça istese bile önce ne kaybolacağını söyle ve teyit al.

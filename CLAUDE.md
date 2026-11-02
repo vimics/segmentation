@@ -49,6 +49,12 @@ These are decided. Don't change them without being asked:
 - The consent wording, `privacy.html` and what the code sends must always match.
 - Run `tools/check-commit.run.ts` before pushing anything built from real cases.
 
+## Repository
+
+- `vimics/segmentation`, published at https://vimics.vet/segmentation/. Onur owns the repo and its settings, and Umut pushes to it.
+- The team rules in `.claude/CLAUDE.md` apply: no force push or history rewrite, push only when the user says to, `noindex` until launch, no `CNAME` file.
+- `umuttutal/v-seg-legacy` is a private archive of the earlier repository. Don't push to it.
+
 ## Working here
 
 - `main` deploys to GitHub Pages on every push, after unit tests pass.

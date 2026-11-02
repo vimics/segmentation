@@ -4,6 +4,8 @@ A browser tool for veterinary CT. A vet enters patient details and drops a DICOM
 
 Not suitable for surgical planning or 3D printing.
 
+Published at https://vimics.vet/segmentation/ from `vimics/segmentation`. The domain comes from the `vimics/vimics.github.io` site, so this repository has no `CNAME` file. Team rules for people and Claude Code sessions are in [`.claude/CLAUDE.md`](.claude/CLAUDE.md).
+
 ## Run it
 
 ```sh
