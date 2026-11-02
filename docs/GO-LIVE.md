@@ -52,14 +52,10 @@ Result: the tool is live at `vimics.vet/segmentation/`, not linked from anywhere
 - The website repository is renamed to `vimics.github.io`. vimics.vet, its sitemap pages and `/dicom/` still work.
 - V-Seg's code is in `vimics/segmentation`, and Umut can push to it and to the website repository.
 - A private copy of the earlier repository is kept at `umuttutal/v-seg-legacy`.
+- Onur set the Pages source of `vimics/segmentation` to GitHub Actions, and the tool is live at `https://vimics.vet/segmentation/`.
+- The earlier public repository `umuttutal/v-seg` is deleted, so `umuttutal.github.io/v-seg` no longer works.
 
-**Left for Onur:** only he can change repository settings.
-
-1. In `vimics/segmentation`, open **Settings → Pages** and set **Source** to **GitHub Actions**.
-2. Open **Actions → Deploy → Run workflow** on `main`.
-3. **Check:** open `https://vimics.vet/segmentation/`, open a demo case and confirm it rotates.
-
-From then on, every push to `main` tests and publishes the tool. Don't add a `CNAME` file to this repository: the address comes from the website's domain.
+Every push to `main` tests and publishes the tool. Don't add a `CNAME` file to this repository: the address comes from the website's domain.
 
 **Why it's set up this way:** GitHub serves other repositories under your domain only when the main site lives in a repository named `<account>.github.io`. With that name, V-Seg keeps its own repository and its own updates, and the website isn't touched.
 
