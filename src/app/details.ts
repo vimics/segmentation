@@ -6,7 +6,7 @@ export interface CaseDetails {
   name: string;
   species: Species;
   breed: string | null;
-  ageMonths: number;
+  ageYears: number;
   weightKg: number;
   clinician: string | null;
 }
@@ -14,8 +14,7 @@ export interface CaseDetails {
 export interface RawDetails {
   name: string;
   species: string;
-  years: string;
-  months: string;
+  age: string;
   weight: string;
   breed: string;
   clinician: string;
@@ -23,7 +22,8 @@ export interface RawDetails {
 
 export type FieldErrors = Partial<Record<'name' | 'species' | 'age' | 'weight', string>>;
 
-const wholeNumber = (s: string) => (/^\d+$/.test(s) ? parseInt(s, 10) : NaN);
+/** A positive number such as 3, 0.5 or 2,5. Turkish keyboards type a decimal comma. */
+const decimal = (s: string) => (/^\d+([.,]\d+)?$/.test(s) ? parseFloat(s.replace(',', '.')) : NaN);
 
 export function validateDetails(raw: RawDetails): { details?: CaseDetails; errors: FieldErrors } {
   const errors: FieldErrors = {};
@@ -31,17 +31,13 @@ export function validateDetails(raw: RawDetails): { details?: CaseDetails; error
   if (!name) errors.name = "Enter the patient's name.";
   if (raw.species !== 'Dog' && raw.species !== 'Cat') errors.species = 'Choose cat or dog.';
 
-  const yearsText = raw.years.trim(), monthsText = raw.months.trim();
-  const years = yearsText ? wholeNumber(yearsText) : 0;
-  const months = monthsText ? wholeNumber(monthsText) : 0;
-  if (!yearsText && !monthsText) errors.age = 'Enter the age.';
-  else if (Number.isNaN(years) || Number.isNaN(months) || years > 40 || months > 11) errors.age = 'Enter years, and months from 0 to 11.';
-  else if (years === 0 && months === 0) errors.age = 'Enter the age. For under a month, use 1 month.';
+  const ageYears = decimal(raw.age.trim());
+  if (!raw.age.trim()) errors.age = 'Enter the age in years.';
+  else if (!(ageYears > 0 && ageYears <= 40)) errors.age = 'Enter the age in years, for example 3 or 0.5.';
 
-  // Turkish keyboards type a decimal comma.
-  const weightKg = parseFloat(raw.weight.trim().replace(',', '.'));
+  const weightKg = decimal(raw.weight.trim());
   if (!raw.weight.trim()) errors.weight = 'Enter the weight in kg.';
-  else if (!/^\d+([.,]\d+)?$/.test(raw.weight.trim()) || !(weightKg >= 0.05 && weightKg <= 200)) errors.weight = 'Enter a weight in kg, for example 12.4.';
+  else if (!(weightKg >= 0.05 && weightKg <= 200)) errors.weight = 'Enter a weight in kg, for example 12.4.';
 
   if (Object.keys(errors).length) return { errors };
   return {
@@ -50,7 +46,7 @@ export function validateDetails(raw: RawDetails): { details?: CaseDetails; error
       name,
       species: raw.species as Species,
       breed: raw.breed.trim() || null,
-      ageMonths: years * 12 + months,
+      ageYears,
       weightKg,
       clinician: cleanClinician(raw.clinician),
     },
@@ -63,10 +59,8 @@ export function cleanClinician(input: string): string | null {
   return name || null;
 }
 
-export function formatAge(ageMonths: number): string {
-  const y = Math.floor(ageMonths / 12), m = ageMonths % 12;
-  if (y === 0) return `${m} mo`;
-  return m ? `${y} y ${m} mo` : `${y} y`;
+export function formatAge(ageYears: number): string {
+  return `${ageYears} y`;
 }
 
 export function formatStudyDate(dicomDate: string | undefined, today = new Date()): string {
@@ -82,7 +76,7 @@ export function caseLine(d: CaseDetails, date: string): string {
     d.name,
     d.species,
     d.breed,
-    formatAge(d.ageMonths),
+    formatAge(d.ageYears),
     `${d.weightKg} kg`,
     d.clinician ? `${d.clinician}, DVM` : null,
     date,

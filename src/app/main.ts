@@ -30,7 +30,7 @@ function setFieldError(field: string, message?: string) {
 
 function readForm(): RawDetails {
   const v = (id: string) => $<HTMLInputElement>(id).value;
-  return { name: v('f-name'), species, years: v('f-years'), months: v('f-months'), weight: v('f-weight'), breed: v('f-breed'), clinician: v('f-clinician') };
+  return { name: v('f-name'), species, age: v('f-age'), weight: v('f-weight'), breed: v('f-breed'), clinician: v('f-clinician') };
 }
 
 document.querySelectorAll<HTMLButtonElement>('[data-species]').forEach((b) => b.addEventListener('click', () => {
@@ -87,7 +87,7 @@ $<HTMLFormElement>('form').addEventListener('submit', (e) => {
 });
 
 $('f-consent').addEventListener('change', () => setFieldError('consent'));
-for (const [input, field] of [['f-name', 'name'], ['f-years', 'age'], ['f-months', 'age'], ['f-weight', 'weight']]) {
+for (const [input, field] of [['f-name', 'name'], ['f-age', 'age'], ['f-weight', 'weight']]) {
   $(input).addEventListener('input', () => setFieldError(field));
 }
 $('ornek').addEventListener('click', () => void openSample());

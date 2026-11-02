@@ -72,7 +72,7 @@ export function validateCase(body: unknown, maxZip: number): Record<string, unkn
   if (!patient || !isText(patient.name, LIMITS.name) || !(patient.name as string).trim()) throw bad('patient name');
   if (patient.species !== 'Dog' && patient.species !== 'Cat') throw bad('species');
   if (!isOptionalText(patient.breed, LIMITS.breed)) throw bad('breed');
-  if (!isNumber(patient.ageMonths, 0, 12 * 40)) throw bad('age');
+  if (!isNumber(patient.ageYears, 0.01, 40)) throw bad('age');
   if (!isNumber(patient.weightKg, 0.05, 200)) throw bad('weight');
   if (!isOptionalText(c.clinician, LIMITS.clinician)) throw bad('clinician');
   if (!study || typeof study !== 'object') throw bad('study');
@@ -90,7 +90,7 @@ export function validateCase(body: unknown, maxZip: number): Record<string, unkn
     schema: 1,
     appVersion: c.appVersion,
     consent: { version: consent.version, text: consent.text, acceptedAt: consent.acceptedAt },
-    patient: { name: patient.name, species: patient.species, breed: patient.breed, ageMonths: patient.ageMonths, weightKg: patient.weightKg },
+    patient: { name: patient.name, species: patient.species, breed: patient.breed, ageYears: patient.ageYears, weightKg: patient.weightKg },
     clinician: c.clinician,
     study: {
       date: study.date,

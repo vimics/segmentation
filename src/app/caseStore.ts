@@ -109,7 +109,7 @@ export class CaseStore {
         schema: 1,
         appVersion: __APP_VERSION__,
         consent: { version: CONSENT_VERSION, text: req.consentText, acceptedAt: req.acceptedAt },
-        patient: { name: details.name, species: details.species, breed: details.breed, ageMonths: details.ageMonths, weightKg: details.weightKg },
+        patient: { name: details.name, species: details.species, breed: details.breed, ageYears: details.ageYears, weightKg: details.weightKg },
         clinician: details.clinician,
         study: {
           date: first.studyDate || null,

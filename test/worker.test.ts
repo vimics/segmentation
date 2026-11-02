@@ -8,7 +8,7 @@ const validCase = () => ({
   schema: 1,
   appVersion: '0.1.0',
   consent: { version: 'v1', text: 'I agree', acceptedAt: '2026-10-31T10:00:00.000Z' },
-  patient: { name: 'Max', species: 'Dog', breed: null, ageMonths: 38, weightKg: 12.4 },
+  patient: { name: 'Max', species: 'Dog', breed: null, ageYears: 3, weightKg: 12.4 },
   clinician: null,
   study: { date: null, manufacturer: 'A', model: 'B', kernel: 'C', slices: 10, rows: 512, cols: 512, pixelSpacingMm: [0.5, 0.5], sliceSpacingMm: 0.6, dicomSpecies: '', dicomBreed: '' },
   viewer: { thresholdMinHu: 300, thresholdMaxHu: 1900 },

@@ -8,7 +8,7 @@ export interface CaseRecord {
   schema: 1;
   appVersion: string;
   consent: { version: string; text: string; acceptedAt: string };
-  patient: { name: string; species: 'Dog' | 'Cat'; breed: string | null; ageMonths: number; weightKg: number };
+  patient: { name: string; species: 'Dog' | 'Cat'; breed: string | null; ageYears: number; weightKg: number };
   clinician: string | null;
   study: {
     date: string | null;

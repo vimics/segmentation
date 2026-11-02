@@ -15,8 +15,7 @@ const sphereFiles = (syntax: Syntax = 'explicit') => asFiles(spherePhantom({ rad
 async function fillForm(page: Page, opts: { breed?: string; clinician?: string } = {}) {
   await page.fill('#f-name', 'Max');
   await page.click('[data-species="Dog"]');
-  await page.fill('#f-years', '3');
-  await page.fill('#f-months', '2');
+  await page.fill('#f-age', '3');
   await page.fill('#f-weight', '12,4');
   if (opts.breed) await page.fill('#f-breed', opts.breed);
   if (opts.clinician) await page.fill('#f-clinician', opts.clinician);
@@ -115,7 +114,7 @@ test.describe('viewer', () => {
     await open(page, sphereFiles(), { breed: 'Beagle', clinician: 'Jane Doe' });
     await waitForModel(page);
 
-    await expect(page.locator('#vaka-satir')).toHaveText('Max · Dog · Beagle · 3 y 2 mo · 12.4 kg · Jane Doe, DVM · 12 Oct 2026');
+    await expect(page.locator('#vaka-satir')).toHaveText('Max · Dog · Beagle · 3 y · 12.4 kg · Jane Doe, DVM · 12 Oct 2026');
     await expect(page.locator('#yapilar li')).toHaveCount(1);
     await expect(page.locator('.yakinda')).toContainText('A neural network bone segmentation engine is in training at Vimics HQ, will be available at no charge, on vimics.vet/segmentation.');
     await expect(page.locator('.urun-ad')).toHaveText('V-Seg Engine v1.0');
@@ -809,13 +808,13 @@ test.describe('case storage', () => {
 
     const record = seen.record as unknown as {
       consent: { version: string; text: string; acceptedAt: string };
-      patient: { name: string; species: string; breed: string; ageMonths: number; weightKg: number };
+      patient: { name: string; species: string; breed: string; ageYears: number; weightKg: number };
       clinician: string;
       study: { slices: number; dicomSpecies: string };
       files: number;
       zipBytes: number;
     };
-    expect(record.patient).toEqual({ name: 'Max', species: 'Dog', breed: 'Beagle', ageMonths: 38, weightKg: 12.4 });
+    expect(record.patient).toEqual({ name: 'Max', species: 'Dog', breed: 'Beagle', ageYears: 3, weightKg: 12.4 });
     expect(record.clinician).toBe('Jane Doe');
     expect(record.consent.version).toBeTruthy();
     expect(record.consent.text).toContain('de-identified copy');

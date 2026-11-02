@@ -52,8 +52,7 @@ for (const label of CASES) {
     await page.goto('/');
     await page.fill('#f-name', 'Test');
     await page.click(`[data-species="${label.startsWith('cat') ? 'Cat' : 'Dog'}"]`);
-    await page.fill('#f-years', '3');
-    await page.fill('#f-months', '0');
+    await page.fill('#f-age', '3');
     await page.fill('#f-weight', '10');
     await page.check('#f-consent');
 
