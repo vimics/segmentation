@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { unzipSync, zipSync } from 'fflate';
 import { createRequire } from 'node:module';
 import { PLANTED, spherePhantom, writeSlice, type SliceSpec, type Syntax } from '../test/phantom';
+import { vertebraeSlices } from '../test/vertebrae';
 
 type FileInput = { name: string; mimeType: string; buffer: Buffer };
 
@@ -11,6 +12,10 @@ const asFiles = (slices: SliceSpec[]): FileInput[] => slices.map((s, i) => ({
 }));
 
 const sphereFiles = (syntax: Syntax = 'explicit') => asFiles(spherePhantom({ radiusMm: 12, syntax }).slices);
+
+let vertebrae: FileInput[] | null = null;
+/** Three generated vertebrae and a scanner table: a known shape with real bone detail. */
+const vertebraeFiles = () => (vertebrae ??= asFiles(vertebraeSlices()));
 
 async function fillForm(page: Page, opts: { breed?: string; clinician?: string } = {}) {
   await page.fill('#f-name', 'Max');
@@ -62,6 +67,12 @@ async function fakeStorage(page: Page) {
     return route.fulfill({ status: 202, headers: cors, json: {} });
   });
   return seen;
+}
+
+async function openVertebrae(page: Page) {
+  await fakeStorage(page);
+  await open(page, vertebraeFiles());
+  await waitForModel(page);
 }
 
 test.describe('start page', () => {
@@ -147,13 +158,10 @@ test.describe('viewer', () => {
   });
 
   test('threshold, clipping, hide and show all respond', async ({ page }) => {
-    await page.goto('/');
-    await page.click('#ornek');
-    await waitForModel(page);
+    await openVertebrae(page);
     await expect(page.locator('#yapilar li')).toHaveCount(3);
     await expect(page.locator('#yapilar')).not.toContainText('Likely scanner table');
     await expect(page.locator('#filtre-not')).toContainText('thin fragment');
-    await expect(page.locator('#depo')).toBeHidden();
 
     const tris = () => page.locator('#ozet').innerText();
     const before = await tris();
@@ -190,7 +198,7 @@ test.describe('viewer', () => {
     const drawn = await page.evaluate(() => (window as unknown as { drawn: string[] }).drawn);
     expect(drawn).toContain('vimics.vet');
     expect(drawn).toContain('@vimicsveterinary');
-    expect(drawn.some((t) => t.startsWith('Generated vertebrae'))).toBe(true);
+    expect(drawn.some((t) => t.startsWith('Max · Dog'))).toBe(true);
     expect(download.suggestedFilename()).toBe('vimics-v-seg.png');
   });
 });
@@ -307,7 +315,7 @@ test.describe('file formats in real workers, under the production security polic
 });
 
 test.describe('demo cases', () => {
-  for (const [name, species] of [['Dog 2', 'Dog']]) {
+  for (const name of ['Canine Cervical Vertebrae']) {
     test(`${name} opens with no form, and nothing is sent`, async ({ page }) => {
       const problems = collectProblems(page);
       const outgoing: string[] = [];
@@ -317,7 +325,7 @@ test.describe('demo cases', () => {
       await page.locator('#ozet', { hasText: 'triangles' }).waitFor({ timeout: 85_000 });
       await expect(page.locator('#vaka')).toContainText('Patient details removed');
       await expect(page.locator('#uyarilar')).toBeHidden();
-      await expect(page.locator('#vaka')).toContainText(species === 'Cat' ? 'Cat' : 'Dog');
+      await expect(page.locator('#vaka')).toContainText(name);
       await expect(page.locator('#esik-sayi-min')).toHaveValue('300');
       await expect(page.locator('#esik-sayi-max')).toHaveValue('1900');
       await expect(page.locator('#depo')).toBeHidden();
@@ -387,9 +395,7 @@ test.describe('filters and structures', () => {
   const triangles = async (page: Page) => parseInt((await page.locator('#ozet').innerText()).split('·').pop()!.replace(/\D/g, ''), 10);
 
   test('both filters start on, and the note follows the ticks', async ({ page }) => {
-    await page.goto('/');
-    await page.click('#ornek');
-    await waitForModel(page);
+    await openVertebrae(page);
     await expect(page.locator('#filtreler .filtre')).toHaveText(['Small shells (<8 mm³)', 'Thin fragments']);
     await expect(page.locator('#filtre-kabuk')).toBeChecked();
     await expect(page.locator('#filtre-parca')).toBeChecked();
@@ -425,16 +431,16 @@ test.describe('filters and structures', () => {
   });
 
   test('the choice survives a threshold change and resets for a new case', async ({ page }) => {
-    await page.goto('/');
-    await page.click('#ornek');
-    await waitForModel(page);
+    await openVertebrae(page);
     await page.uncheck('#filtre-parca');
     await page.fill('#esik-sayi-min', '400');
     await page.press('#esik-sayi-min', 'Enter');
     await waitForModel(page);
     await expect(page.locator('#filtre-parca')).not.toBeChecked();
     await page.click('#yeni-vaka');
-    await page.click('#ornek');
+    await fillForm(page);
+    await page.setInputFiles('#dosya', vertebraeFiles());
+    await page.click('#basla');
     await waitForModel(page);
     await expect(page.locator('#filtre-parca')).toBeChecked();
     await expect(page.locator('#yapilar-bolme')).not.toHaveAttribute('open');
@@ -496,9 +502,7 @@ test.describe('filters and structures', () => {
   });
 
   test('a piece hidden by clicking the model comes back from the list', async ({ page }) => {
-    await page.goto('/');
-    await page.click('#ornek');
-    await waitForModel(page);
+    await openVertebrae(page);
     const before = await triangles(page);
     const box = (await page.locator('#tuval').boundingBox())!;
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
@@ -526,9 +530,7 @@ test.describe('small screens', () => {
     test(`nothing is cut off on a ${label}`, async ({ browser }) => {
       const context = await browser.newContext({ viewport: { width, height }, hasTouch: true, isMobile: true });
       const page = await context.newPage();
-      await page.goto('/');
-      await page.click('#ornek');
-      await waitForModel(page);
+      await openVertebrae(page);
       expect((await page.locator('.logo-link svg').boundingBox())!.width).toBeGreaterThan(80);
       for (const selector of ['.logo-link svg', '#gonder', '#yeni-vaka', '#sigdir', '.kup-kap', '.yakinda', '#esik-sayi-max', '#aralik', '#esik-not', '#ozet']) {
         const box = (await page.locator(selector).first().boundingBox())!;
@@ -558,7 +560,7 @@ test.describe('rotating the view', () => {
       return still;
     }, { timeout: 20_000, intervals: [250] }).toBe(true);
   };
-  const sample = async (page: Page) => { await page.goto('/'); await page.click('#ornek'); await waitForModel(page); await settle(page); };
+  const sample = async (page: Page) => { await openVertebrae(page); await settle(page); };
   const center = async (page: Page) => { const b = (await page.locator('#tuval').boundingBox())!; return { x: b.x + b.width / 2, y: b.y + b.height / 2, b }; };
   const drag = async (page: Page, dx: number, dy: number, button: 'left' | 'right' = 'left') => {
     const { x, y } = await center(page);

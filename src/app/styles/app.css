@@ -267,5 +267,5 @@ input[type="checkbox"]:checked::before { background: var(--vurgu-anlamli); }
   .serit { grid-template-columns: 1fr; }
   .serit div + div { padding-left: 0; border-left: 0; border-top: 1px solid var(--ayrac); }
 }
-@media (max-width: 480px) { .urun-ad { display: none; } .ust .btn { padding-inline: var(--b2); font-size: 12.5px; white-space: nowrap; } .ust .logo-link { flex: none; } .ust .logo-link svg { width: 118px; height: auto; } .ust { gap: var(--b2); } .baslangic-ic { padding-inline: var(--b4); } }
+@media (max-width: 480px) { .urun-ad, .dar-gizle { display: none; } .ust .btn { padding-inline: var(--b2); font-size: 12.5px; white-space: nowrap; } .ust .logo-link { flex: none; } .ust .logo-link svg { width: 118px; height: auto; } .ust { gap: var(--b2); } .baslangic-ic { padding-inline: var(--b4); } }
 @media (prefers-reduced-motion: reduce) { .cubuk i { transition: none; } }

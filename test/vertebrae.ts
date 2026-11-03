@@ -1,9 +1,9 @@
-import type { Vec3, Volume } from '../types';
+import type { Vec3, Volume } from '../src/engine/types';
+import type { SliceSpec } from './phantom';
 
 /**
- * A generated sample: three canine-style lumbar vertebrae and a scanner table, stored as a
- * CT-like Hounsfield volume. It runs through the same engine as a real scan, and it is never
- * uploaded. It is not anatomy from any patient.
+ * Generated test anatomy: three canine-style lumbar vertebrae and a scanner table, stored as a
+ * CT-like Hounsfield volume. It is not anatomy from any patient.
  */
 const H = 0.6, X0 = -40, Y0 = -22, Z0 = -46, NX = 134, NY = 106, NZ = 154;
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
@@ -51,9 +51,7 @@ const VERTEBRAE = [
   { z: -26, scale: 0.97 },
 ];
 
-export const SAMPLE_INFO = { rows: NY, cols: NX, slices: NZ, spacing: H };
-
-export function buildSampleVolume(): Volume {
+export function buildVertebraeVolume(): Volume {
   const data = new Int16Array(NX * NY * NZ);
   const positions = new Float64Array(NZ * 3);
   // Stored with rows running from the top of the scanner down, the way real CT images are.
@@ -88,4 +86,18 @@ export function buildSampleVolume(): Volume {
     }
   }
   return { nx: NX, ny: NY, nz: NZ, data, positions, rowDir, colDir, dx: H, dy: H };
+}
+
+/** The same vertebrae as a DICOM series, for loading through the page like a vet's own files. */
+export function vertebraeSlices(): SliceSpec[] {
+  const v = buildVertebraeVolume();
+  return Array.from({ length: v.nz }, (_, k) => ({
+    rows: v.ny,
+    cols: v.nx,
+    position: [...v.positions.subarray(k * 3, k * 3 + 3)],
+    orientation: [...v.rowDir, ...v.colDir],
+    pixelSpacing: [v.dy, v.dx] as [number, number],
+    instance: k + 1,
+    hu: (i: number, j: number) => v.data[(k * v.ny + j) * v.nx + i],
+  }));
 }

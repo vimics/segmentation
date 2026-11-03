@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSampleVolume } from '../src/engine/sample/bone';
+import { buildVertebraeVolume } from './vertebrae';
 import { BONE_RANGE, HU_MAX } from '../src/engine/hu';
 import { MAX_LISTED } from '../src/engine/surface/components';
 import { SHELL_ALLOWANCE, SurfaceEngine } from '../src/engine/surface/pipeline';
@@ -118,7 +118,7 @@ describe('structures', () => {
   });
 
   it('auto-hides the table in the sample and keeps the vertebrae', () => {
-    const engine = new SurfaceEngine(buildSampleVolume());
+    const engine = new SurfaceEngine(buildVertebraeVolume());
     engine.preview(above(250));
     const { structures } = engine.full(above(250));
     const shown = structures.filter((s) => !s.autoHidden), hidden = structures.filter((s) => s.autoHidden);
@@ -231,7 +231,7 @@ describe('a two-ended density range', () => {
 
   it('starts every scan at the same range, on the sample too', () => {
     expect(BONE_RANGE).toEqual({ min: 300, max: 1900 });
-    const { structures } = new SurfaceEngine(buildSampleVolume()).full(BONE_RANGE);
+    const { structures } = new SurfaceEngine(buildVertebraeVolume()).full(BONE_RANGE);
     expect(structures.filter((s) => !s.autoHidden).length).toBeGreaterThan(0);
   });
 });
@@ -287,7 +287,7 @@ describe('layers behind the filters', () => {
   });
 
   it('counts the table as a thin fragment', () => {
-    const r = new SurfaceEngine(buildSampleVolume()).full(BONE_RANGE);
+    const r = new SurfaceEngine(buildVertebraeVolume()).full(BONE_RANGE);
     expect(layer(r, 'table').length).toBe(1);
     expect(r.fragmentCount).toBeGreaterThanOrEqual(1);
   });

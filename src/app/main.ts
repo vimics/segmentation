@@ -3,7 +3,6 @@ import { toSources, type Source } from '../engine/io/sources';
 import { assembleVolume, scanSeries } from '../engine/load';
 import { fetchDemo } from '../engine/demo';
 import { BONE_RANGE, HU_MAX, HU_MIN, type HuRange } from '../engine/hu';
-import { SAMPLE_INFO } from '../engine/sample/bone';
 import type { SeriesInfo, StructureMesh, SurfaceResult, Vec3 } from '../engine/types';
 import { Viewer, type MeasureKind, type Measurement } from '../engine/viewer/viewer';
 import type { MeshRequest } from '../engine/workers/mesh.worker';
@@ -90,7 +89,6 @@ $('f-consent').addEventListener('change', () => setFieldError('consent'));
 for (const [input, field] of [['f-name', 'name'], ['f-age', 'age'], ['f-weight', 'weight']]) {
   $(input).addEventListener('input', () => setFieldError(field));
 }
-$('ornek').addEventListener('click', () => void openSample());
 document.querySelectorAll<HTMLButtonElement>('[data-demo]').forEach((b) => b.addEventListener('click', () => void openDemo(b.dataset.demo as string, b.textContent ?? '')));
 
 // ---- Screens ----------------------------------------------------------------------------------
@@ -113,7 +111,8 @@ function show(screen: Screen) {
   const send = $('gonder');
   const realCase = inViewer && !current?.sample;
   send.className = `btn ${realCase ? 'btn-birincil' : 'btn-ikincil'}`;
-  send.textContent = realCase ? 'Send this case to Vimics' : 'Send a case';
+  // Phones drop "this case", which would push the button off the screen.
+  send.innerHTML = realCase ? 'Send <span class="dar-gizle">this case </span>to Vimics' : 'Send a case';
 }
 
 function showError(label: string, title: string, text: string) {
@@ -296,8 +295,8 @@ $('aksiyon-gizle').addEventListener('click', () => {
   selectedStructure = null;
 });
 
-/** What the summary states for the generated sample or a demo case. */
-let exampleInfo: { slices: number; cols: number; rows: number; spacing: number | string } = SAMPLE_INFO;
+/** What the summary states for a demo case. */
+let exampleInfo = { slices: 0, cols: 0, rows: 0, spacing: '' };
 
 function renderSummary() {
   if (!latestSurface) return;
@@ -684,16 +683,6 @@ async function openDemo(file: string, label: string) {
   } catch (err) {
     showError('Something went wrong', 'This demo case could not be opened', err instanceof Error ? err.message : String(err));
   }
-}
-
-async function openSample() {
-  current = { details: null, acceptedAt: '', sources: [], series: [], selected: null, sample: true, uploadWarnings: [] };
-  resetForNewModel();
-  show('loading');
-  setStep(2, 'Generating', 70);
-  exampleInfo = SAMPLE_INFO;
-  showExampleChrome('Sample', 'Generated vertebrae · Not a real patient');
-  startMesh({ type: 'sample' }, [], { rowDir: [1, 0, 0], colDir: [0, -1, 0] });
 }
 
 function backToStart() {
