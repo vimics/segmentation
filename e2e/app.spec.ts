@@ -307,7 +307,7 @@ test.describe('file formats in real workers, under the production security polic
 });
 
 test.describe('demo cases', () => {
-  for (const [name, species] of [['Cat 1', 'Cat'], ['Cat 2', 'Cat'], ['Dog 1', 'Dog'], ['Dog 2', 'Dog']]) {
+  for (const [name, species] of [['Dog 2', 'Dog']]) {
     test(`${name} opens with no form, and nothing is sent`, async ({ page }) => {
       const problems = collectProblems(page);
       const outgoing: string[] = [];

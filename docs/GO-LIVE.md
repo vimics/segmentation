@@ -103,7 +103,7 @@ None of this is technical, and some of it could stop the launch.
 | Decision | Why | Who |
 |---|---|---|
 | **Legal review** of consent, `privacy.html` and the footer under KVKK and GDPR | The tool stores scans for AI training, and the consent box is required to use it | Lawyer |
-| **Permission for the 4 demo cases** | They are real animals' scans, already public, and anyone can download them. Removing them later means rewriting Git history, and copies may already exist | Umut |
+| **Permission for the demo cases** | Dog 2 is a real animal's scan on the start page, and anyone can download it. Cat 1, Cat 2 and Dog 1 were taken off on 2026-11-03 but are still in the Git history. Removing any of them fully means rewriting that history, and copies may already exist | Umut |
 | **Is the footer's and sidebar's wording acceptable** | The sidebar promises a free segmentation engine "in training" | Umut |
 | **How long data is kept** | `privacy.html` must state it, and it doesn't yet | Umut and lawyer |
 | **Who handles deletion requests** | They arrive at info@vimics.vet with a case reference | Umut |
@@ -158,7 +158,7 @@ The tool's "Send a case" button already opens `/dicom/`.
 - Lossy-compressed and enhanced multi-frame scans are refused, with a message saying so
 - Upload links can't enforce a size. Bot protection, rate limits and the site's storage limit are the defence
 - Treat stored files as untrusted, since anyone can reach the upload service once it's public
-- GitHub Pages suggests staying under about 100 GB of traffic a month. Demo files average 57 MB, so that's roughly 1,750 demo opens a month. Vets' own scans don't count, because they never touch GitHub
+- GitHub Pages suggests staying under about 100 GB of traffic a month. The Dog 2 demo is 68 MB, so that's roughly 1,500 demo opens a month. Vets' own scans don't count, because they never touch GitHub
 
 ## Cost
 
